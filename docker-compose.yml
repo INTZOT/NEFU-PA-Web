@@ -1,0 +1,104 @@
+name: nefu-pa-web
+
+services:
+  # ---------- 反向代理 + 自动 HTTPS ----------
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      SITE_DOMAIN: ${SITE_DOMAIN:?请在 .env 中设置 SITE_DOMAIN}
+    volumes:
+      - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      web:
+        condition: service_healthy
+    networks: [backend]
+
+  # ---------- 数据库 ----------
+  db:
+    build: ./db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-nefu}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?请在 .env 中设置 POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-nefu_pa}
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    # 数据库不对外暴露端口，仅容器网络可达
+    networks: [backend]
+
+  # ---------- 网站 ----------
+  web:
+    build: ./web
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgres://${POSTGRES_USER:-nefu}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-nefu_pa}
+      SESSION_SECRET: ${SESSION_SECRET:?请在 .env 中设置 SESSION_SECRET}
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:3000/healthz"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
+    networks: [backend]
+
+  # ---------- QQ 机器人服务 ----------
+  bot:
+    build: ./bot
+    restart: unless-stopped
+    environment:
+      # 机器人使用受限数据库账号（见 .env.example 说明）
+      DATABASE_URL: postgres://${BOT_DB_USER:-nefu_bot}:${BOT_DB_PASSWORD:?请在 .env 中设置 BOT_DB_PASSWORD}@db:5432/${POSTGRES_DB:-nefu_pa}
+      # OneBot 协议端（NapCat）地址，容器网络内可达
+      ONEBOT_WS_URL: ${ONEBOT_WS_URL:-ws://napcat:3001}
+      # 共享规则接口：密码加密与邀请码生成只在网站实现（见 docs/p3-blueprint.md 第三节）
+      SHARED_RULES_URL: ${SHARED_RULES_URL:-http://web:3000/internal/shared-rules}
+    depends_on:
+      db:
+        condition: service_healthy
+    networks: [backend]
+
+  # ---------- QQ 协议端 ----------
+  # 说明：NapCat 需要扫码登录，且必须挂在宿主网络才能与 QQ 服务器正常通信。
+  #       因其涉及交互式登录，默认不随 compose 一起启动；
+  #       首次部署请单独运行，详见 README「QQ 协议端」一节。
+  napcat:
+    image: mlikiowa/napcat-docker:latest
+    restart: unless-stopped
+    profiles: [napcat]
+    environment:
+      NAPCAT_UID: ${NAPCAT_UID:-1000}
+      NAPCAT_GID: ${NAPCAT_GID:-1000}
+    ports:
+      # 仅绑定本机回环，不对外暴露
+      - "127.0.0.1:3001:3001"
+      - "127.0.0.1:6099:6099"
+    volumes:
+      - napcat_config:/app/napcat/config
+      - napcat_qq:/app/.config/QQ
+    networks: [backend]
+
+volumes:
+  db_data:
+  caddy_data:
+  caddy_config:
+  napcat_config:
+  napcat_qq:
+
+networks:
+  backend:
+    driver: bridge

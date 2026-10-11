@@ -1,0 +1,9 @@
+FROM python:3.13-slim
+
+WORKDIR /app
+ENV PYTHONUNBUFFERED=1 PYTHONDONTWRITEBYTECODE=1
+
+COPY bot ./bot
+
+EXPOSE 8000
+CMD ["python", "-m", "bot.main"]

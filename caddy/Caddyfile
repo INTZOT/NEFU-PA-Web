@@ -1,0 +1,13 @@
+# Caddy 自动为域名申请并续期 HTTPS 证书，无需手工配置。
+# SITE_DOMAIN 由 docker-compose 从 .env 注入。
+
+{$SITE_DOMAIN} {
+	encode zstd gzip
+
+	reverse_proxy web:3000
+
+	log {
+		output stdout
+		format console
+	}
+}
