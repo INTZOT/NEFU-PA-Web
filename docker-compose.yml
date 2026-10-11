@@ -28,7 +28,9 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?请在 .env 中设置 POSTGRES_PASSWORD}
       POSTGRES_DB: ${POSTGRES_DB:-nefu_pa}
     volumes:
-      - db_data:/var/lib/postgresql/data
+      # PostgreSQL 18 起，官方镜像要求挂载 /var/lib/postgresql（数据位于版本化子目录），
+      # 旧的 /var/lib/postgresql/data 挂载方式在 18+ 会启动失败。
+      - db_data:/var/lib/postgresql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 10s
@@ -49,7 +51,7 @@ services:
       db:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-fsS", "http://localhost:3000/healthz"]
+      test: ["CMD", "node", "bin/healthcheck.mjs"]
       interval: 10s
       timeout: 5s
       retries: 10
