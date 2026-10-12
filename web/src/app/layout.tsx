@@ -36,6 +36,9 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             <span className="flex-1" />
             {user ? (
               <>
+                <Link href="/rooms" className="text-neutral-600 hover:text-neutral-900">
+                  约球
+                </Link>
                 {canEnterAdmin(user) ? (
                   <Link href="/admin" className="text-neutral-600 hover:text-neutral-900">
                     管理

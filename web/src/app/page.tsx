@@ -40,6 +40,9 @@ export default async function HomePage() {
               <Link href="/events" className="text-neutral-500 hover:text-neutral-900">
                 社团活动
               </Link>
+              <Link href="/rooms" className="text-neutral-500 hover:text-neutral-900">
+                约球大厅
+              </Link>
             </div>
           </div>
         ) : (
