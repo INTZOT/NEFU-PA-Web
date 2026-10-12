@@ -106,7 +106,9 @@ def copy_native_qr():
             STATE['err'] = p.stderr.decode('utf-8', 'replace')[:200]
             return False
         with open(NATIVE_QR_LOCAL, 'rb') as f:
-            head = f.read(8)
+            head = f.read(4)
+        # PNG 魔数前 4 字节：\x89 P N G
+        # （此前读 8 字节却只比 4 字节，导致判断恒为假，一直退回日志重建）
         return head == bytes([0x89]) + b'PNG'
     except Exception:
         return False
