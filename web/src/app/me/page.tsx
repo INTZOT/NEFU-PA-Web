@@ -62,7 +62,7 @@ export default async function MePage({
       <Notice ok={ok} error={error} />
 
       {invites.length > 0 ? (
-        <section className="space-y-3 rounded-lg border border-amber-200 bg-amber-50 p-4">
+        <section className="space-y-3 rounded-xl border border-amber-200 bg-amber-50 p-4">
           <h2 className="font-semibold text-amber-900">待你确认的双打搭档</h2>
           {invites.map((inv) => (
             <div key={inv.pairingId} className="space-y-2 text-sm">
@@ -78,7 +78,7 @@ export default async function MePage({
                 <form action={`/api/pairings/${inv.pairingId}/accept`} method="post">
                   <button
                     type="submit"
-                    className="rounded bg-neutral-900 px-3 py-1.5 text-sm text-white"
+                    className="rounded bg-brand px-3 py-1.5 text-sm text-white"
                   >
                     同意
                   </button>
@@ -86,7 +86,7 @@ export default async function MePage({
                 <form action={`/api/pairings/${inv.pairingId}/reject`} method="post">
                   <button
                     type="submit"
-                    className="text-sm text-neutral-500 hover:text-neutral-900"
+                    className="text-sm text-ink-muted hover:text-ink"
                   >
                     拒绝
                   </button>
@@ -97,22 +97,22 @@ export default async function MePage({
         </section>
       ) : null}
 
-      <section className="rounded-lg border border-neutral-200 bg-white p-4">
+      <section className="rounded-xl border border-line bg-surface p-4">
         <h1 className="text-xl font-bold">{user.name}</h1>
         <dl className="mt-3 grid grid-cols-2 gap-y-2 text-sm">
-          <dt className="text-neutral-500">角色</dt>
+          <dt className="text-ink-muted">角色</dt>
           <dd>{ROLE_LABEL[user.role] ?? user.role}</dd>
-          <dt className="text-neutral-500">学号</dt>
+          <dt className="text-ink-muted">学号</dt>
           <dd>
             {user.studentId}
-            <span className="ml-2 text-xs text-neutral-400">
+            <span className="ml-2 text-xs text-ink-subtle">
               登录用；不对其他成员展示（R-53）
             </span>
           </dd>
         </dl>
       </section>
 
-      <section className="rounded-lg border border-neutral-200 bg-white p-4">
+      <section className="rounded-xl border border-line bg-surface p-4">
         <h2 className="font-semibold">比赛积分</h2>
         {season ? (
           <div className="mt-2 space-y-1 text-sm">
@@ -120,23 +120,23 @@ export default async function MePage({
               本赛季（{season.name}）：
               <span className="text-lg font-bold">{season.rating}</span>
             </p>
-            <p className="text-neutral-500">
+            <p className="text-ink-muted">
               战绩 {season.wins} 胜 {season.losses} 负
             </p>
           </div>
         ) : (
-          <p className="mt-2 text-sm text-neutral-500">
+          <p className="mt-2 text-sm text-ink-muted">
             当前没有进行中的赛季。管理员配置赛季起止日期后，此处会显示你的比赛积分。
           </p>
         )}
-        <p className="mt-3 text-xs text-neutral-500">
+        <p className="mt-3 text-xs text-ink-muted">
           比赛积分只由官方比赛产生，按标准 ELO 结算（K=40），按学年归档。
         </p>
       </section>
 
-      <section className="rounded-lg border border-neutral-200 bg-white p-4">
+      <section className="rounded-xl border border-line bg-surface p-4">
         <h2 className="font-semibold">个人自评分</h2>
-        <p className="mt-1 text-sm text-neutral-600">
+        <p className="mt-1 text-sm text-ink-muted">
           这是你对自己水平的评估，用于约球时供他人参考。它不随比赛结果变化，可随时修改。
         </p>
 
@@ -151,12 +151,12 @@ export default async function MePage({
               defaultValue={user.selfRating}
               className="flex-1"
             />
-            <span className="text-sm text-neutral-500">0–1000</span>
+            <span className="text-sm text-ink-muted">0–1000</span>
           </div>
-          <p className="text-xs text-neutral-500">
+          <p className="text-xs text-ink-muted">
             档位参考：小白 0–200 · 新手 200–400 · 熟手 400–600 · 高手 600–800 · 大师 800–1000
           </p>
-          <button type="submit" className="rounded bg-neutral-900 px-4 py-2 text-sm text-white">
+          <button type="submit" className="rounded bg-brand px-4 py-2 text-sm text-white">
             保存
           </button>
         </form>
@@ -164,13 +164,13 @@ export default async function MePage({
         <p className="mt-3 text-sm">
           当前自评分：
           <span className="font-semibold">{user.selfRating}</span>
-          <span className="ml-2 text-neutral-500">（{tierOf(user.selfRating)}）</span>
+          <span className="ml-2 text-ink-muted">（{tierOf(user.selfRating)}）</span>
         </p>
       </section>
 
-      <section id="credentials" className="rounded-lg border border-neutral-200 bg-white p-4">
+      <section id="credentials" className="rounded-xl border border-line bg-surface p-4">
         <h2 className="font-semibold">账号凭据</h2>
-        <p className="mt-1 text-sm text-neutral-600">
+        <p className="mt-1 text-sm text-ink-muted">
           登录用的 QQ 号与学号可以自行修改，无需管理员审批（D-11）。
           改完立即生效，下次登录请用新的。
         </p>
@@ -178,30 +178,30 @@ export default async function MePage({
         <form action="/api/me/credentials" method="post" className="mt-3 space-y-3">
           <div className="grid gap-3 sm:grid-cols-2">
             <label className="text-sm">
-              <span className="text-neutral-500">QQ 号</span>
+              <span className="text-ink-muted">QQ 号</span>
               <input
                 name="qqNumber"
                 defaultValue={user.qqNumber}
                 required
                 pattern="\\d{5,12}"
-                className="mt-1 w-full rounded border border-neutral-300 px-3 py-2"
+                className="mt-1 w-full rounded border border-line-strong px-3 py-2"
               />
             </label>
             <label className="text-sm">
-              <span className="text-neutral-500">学号</span>
+              <span className="text-ink-muted">学号</span>
               <input
                 name="studentId"
                 defaultValue={user.studentId}
                 required
                 pattern="\\d{10}"
-                className="mt-1 w-full rounded border border-neutral-300 px-3 py-2"
+                className="mt-1 w-full rounded border border-line-strong px-3 py-2"
               />
             </label>
           </div>
-          <button type="submit" className="rounded bg-neutral-900 px-4 py-2 text-sm text-white">
+          <button type="submit" className="rounded bg-brand px-4 py-2 text-sm text-white">
             保存凭据
           </button>
-          <p className="text-xs text-neutral-500">
+          <p className="text-xs text-ink-muted">
             ⚠️ 换绑后，<strong>用旧 QQ 号将无法再登录</strong>。
             积分、约球等历史数据跟随账号，不受影响。
           </p>
@@ -209,7 +209,7 @@ export default async function MePage({
       </section>
 
       <form action="/api/auth/logout" method="post">
-        <button type="submit" className="text-sm text-neutral-500 hover:text-neutral-900">
+        <button type="submit" className="text-sm text-ink-muted hover:text-ink">
           退出登录
         </button>
       </form>

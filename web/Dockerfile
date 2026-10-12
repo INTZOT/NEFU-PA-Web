@@ -41,6 +41,12 @@ COPY --from=builder --chown=nextjs:nodejs /app/scripts ./scripts
 COPY --from=builder --chown=nextjs:nodejs /app/db ./db
 COPY --from=builder --chown=nextjs:nodejs /app/bin ./bin
 
+# 社团照片目录（D-31）。
+# 为什么必须在切到非 root 之前建：
+#   命名卷首次挂载时，Docker 会把镜像里该路径的**属主与权限**复制到卷上。
+#   若镜像里没有这个目录，卷会被建成 root:root，而容器以 uid 1001 运行 → 上传 Permission denied。
+RUN mkdir -p /app/uploads && chown -R nextjs:nodejs /app/uploads
+
 USER nextjs
 EXPOSE 3000
 ENV PORT=3000 HOSTNAME=0.0.0.0

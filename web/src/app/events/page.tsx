@@ -27,7 +27,7 @@ export default async function EventsPage() {
       <h1 className="text-xl font-bold">社团活动</h1>
 
       {events.length === 0 ? (
-        <p className="rounded-lg border border-neutral-200 bg-white p-6 text-center text-sm text-neutral-500">
+        <p className="rounded-xl border border-line bg-surface p-6 text-center text-sm text-ink-muted">
           暂无活动。
         </p>
       ) : (
@@ -35,16 +35,16 @@ export default async function EventsPage() {
           {events.map((e) => {
             const open = isRegistrationOpen(e);
             return (
-              <li key={e.id} className="rounded-lg border border-neutral-200 bg-white p-4">
+              <li key={e.id} className="rounded-xl border border-line bg-surface p-4">
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className="rounded bg-neutral-100 px-2 py-0.5 text-xs text-neutral-600">
+                  <span className="rounded bg-surface-muted px-2 py-0.5 text-xs text-ink-muted">
                     {e.format === "doubles" ? "双打" : "单打"}
                   </span>
                   <span
                     className={
                       open
                         ? "rounded bg-green-100 px-2 py-0.5 text-xs text-green-800"
-                        : "rounded bg-neutral-100 px-2 py-0.5 text-xs text-neutral-500"
+                        : "rounded bg-surface-muted px-2 py-0.5 text-xs text-ink-muted"
                     }
                   >
                     {open ? "报名中" : (STATUS_LABEL[e.status] ?? e.status)}
@@ -55,11 +55,11 @@ export default async function EventsPage() {
                     </Link>
                   </h2>
                 </div>
-                <p className="mt-2 text-sm text-neutral-600">
+                <p className="mt-2 text-sm text-ink-muted">
                   {formatTime(e.startAt)}
                   {e.location ? ` · ${e.location}` : ""}
                 </p>
-                <p className="mt-1 text-sm text-neutral-500">
+                <p className="mt-1 text-sm text-ink-muted">
                   名额 {e.capacity} {e.capacityUnit === "teams" ? "队" : "人"}
                   {e.remaining > 0 ? ` · 还剩 ${e.remaining}` : " · 已满"}
                   {e.waitlistCount > 0 ? ` · 候补 ${e.waitlistCount}` : ""}

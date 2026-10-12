@@ -26,9 +26,9 @@ export default async function MyRoomsPage({
   const RoomList = ({ rooms }: { rooms: typeof initiated }) => (
     <ul className="space-y-2">
       {rooms.map((r) => (
-        <li key={r.id} className="rounded-lg border border-neutral-200 bg-white p-3">
+        <li key={r.id} className="rounded-xl border border-line bg-surface p-3">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="rounded bg-neutral-100 px-2 py-0.5 text-xs text-neutral-600">
+            <span className="rounded bg-surface-muted px-2 py-0.5 text-xs text-ink-muted">
               {STATUS_LABEL[r.status] ?? r.status}
             </span>
             <Link href={`/rooms/${r.id}`} className="font-medium hover:underline">
@@ -40,7 +40,7 @@ export default async function MyRoomsPage({
               </span>
             ) : null}
           </div>
-          <p className="mt-1 text-xs text-neutral-400">
+          <p className="mt-1 text-xs text-ink-subtle">
             已加入 {r.capacity - r.seatsLeft}/{r.capacity}
           </p>
         </li>
@@ -52,14 +52,14 @@ export default async function MyRoomsPage({
     <div className="space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
-          <Link href="/rooms" className="text-sm text-neutral-500 hover:text-neutral-900">
+          <Link href="/rooms" className="text-sm text-ink-muted hover:text-ink">
             ← 约球大厅
           </Link>
           <h1 className="mt-1 text-xl font-bold">我的约球</h1>
         </div>
         <Link
           href="/rooms/new"
-          className="rounded bg-neutral-900 px-4 py-2 text-sm text-white"
+          className="rounded bg-brand px-4 py-2 text-sm text-white"
         >
           发起约球
         </Link>
@@ -76,7 +76,7 @@ export default async function MyRoomsPage({
       <section className="space-y-2">
         <h2 className="font-semibold">我发起的</h2>
         {initiated.length === 0 ? (
-          <p className="text-sm text-neutral-500">还没有发起过约球。</p>
+          <p className="text-sm text-ink-muted">还没有发起过约球。</p>
         ) : (
           <RoomList rooms={initiated} />
         )}
@@ -85,7 +85,7 @@ export default async function MyRoomsPage({
       <section className="space-y-2">
         <h2 className="font-semibold">我加入的</h2>
         {joined.length === 0 ? (
-          <p className="text-sm text-neutral-500">还没有加入别人的约球。</p>
+          <p className="text-sm text-ink-muted">还没有加入别人的约球。</p>
         ) : (
           <RoomList rooms={joined} />
         )}

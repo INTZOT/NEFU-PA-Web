@@ -17,7 +17,7 @@ export function EventForm({ action, submitLabel }: { action: string; submitLabel
           required
           maxLength={100}
           placeholder="如：2026 年春季匹克球友谊赛"
-          className="mt-1 w-full rounded border border-neutral-300 px-3 py-2 outline-none focus:border-neutral-900"
+          className="mt-1 w-full rounded border border-line-strong px-3 py-2 outline-none focus:border-brand"
         />
       </div>
 
@@ -28,7 +28,7 @@ export function EventForm({ action, submitLabel }: { action: string; submitLabel
           name="description"
           rows={4}
           placeholder="赛制、注意事项等。换行会原样保留。"
-          className="mt-1 w-full rounded border border-neutral-300 px-3 py-2 outline-none focus:border-neutral-900"
+          className="mt-1 w-full rounded border border-line-strong px-3 py-2 outline-none focus:border-brand"
         />
       </div>
 
@@ -38,7 +38,7 @@ export function EventForm({ action, submitLabel }: { action: string; submitLabel
           <select
             id="format"
             name="format"
-            className="mt-1 w-full rounded border border-neutral-300 px-3 py-2 outline-none focus:border-neutral-900"
+            className="mt-1 w-full rounded border border-line-strong px-3 py-2 outline-none focus:border-brand"
           >
             <option value="singles">单打（名额按人）</option>
             <option value="doubles">双打（名额按队）</option>
@@ -54,9 +54,9 @@ export function EventForm({ action, submitLabel }: { action: string; submitLabel
             min={1}
             required
             defaultValue={16}
-            className="mt-1 w-full rounded border border-neutral-300 px-3 py-2 outline-none focus:border-neutral-900"
+            className="mt-1 w-full rounded border border-line-strong px-3 py-2 outline-none focus:border-brand"
           />
-          <p className="mt-1 text-xs text-neutral-500">双打填队伍数，一支队算一个名额。</p>
+          <p className="mt-1 text-xs text-ink-muted">双打填队伍数，一支队算一个名额。</p>
         </div>
       </div>
 
@@ -68,7 +68,7 @@ export function EventForm({ action, submitLabel }: { action: string; submitLabel
             name="startAt"
             type="datetime-local"
             required
-            className="mt-1 w-full rounded border border-neutral-300 px-3 py-2 outline-none focus:border-neutral-900"
+            className="mt-1 w-full rounded border border-line-strong px-3 py-2 outline-none focus:border-brand"
           />
         </div>
 
@@ -79,7 +79,7 @@ export function EventForm({ action, submitLabel }: { action: string; submitLabel
             name="location"
             maxLength={80}
             placeholder="如：体育馆 3 号场"
-            className="mt-1 w-full rounded border border-neutral-300 px-3 py-2 outline-none focus:border-neutral-900"
+            className="mt-1 w-full rounded border border-line-strong px-3 py-2 outline-none focus:border-brand"
           />
         </div>
       </div>
@@ -93,9 +93,9 @@ export function EventForm({ action, submitLabel }: { action: string; submitLabel
             id="registrationDeadline"
             name="registrationDeadline"
             type="datetime-local"
-            className="mt-1 w-full rounded border border-neutral-300 px-3 py-2 outline-none focus:border-neutral-900"
+            className="mt-1 w-full rounded border border-line-strong px-3 py-2 outline-none focus:border-brand"
           />
-          <p className="mt-1 text-xs text-neutral-500">留空则默认赛前 24 小时。</p>
+          <p className="mt-1 text-xs text-ink-muted">留空则默认赛前 24 小时。</p>
         </div>
 
         <div>
@@ -103,7 +103,7 @@ export function EventForm({ action, submitLabel }: { action: string; submitLabel
           <select
             id="status"
             name="status"
-            className="mt-1 w-full rounded border border-neutral-300 px-3 py-2 outline-none focus:border-neutral-900"
+            className="mt-1 w-full rounded border border-line-strong px-3 py-2 outline-none focus:border-brand"
           >
             <option value="draft">草稿（不公开、不能报名）</option>
             <option value="open">开放报名</option>
@@ -112,10 +112,10 @@ export function EventForm({ action, submitLabel }: { action: string; submitLabel
       </div>
 
       <div className="flex items-center gap-3 pt-2">
-        <button type="submit" className="rounded bg-neutral-900 px-4 py-2 text-sm text-white">
+        <button type="submit" className="rounded bg-brand px-4 py-2 text-sm text-white">
           {submitLabel}
         </button>
-        <Link href="/admin/events" className="text-sm text-neutral-500 hover:text-neutral-900">
+        <Link href="/admin/events" className="text-sm text-ink-muted hover:text-ink">
           取消
         </Link>
       </div>

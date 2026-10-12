@@ -27,7 +27,7 @@ export default async function EditAnnouncementPage({
     <div className="space-y-5">
       <Link
         href="/admin/announcements"
-        className="text-sm text-neutral-500 hover:text-neutral-900"
+        className="text-sm text-ink-muted hover:text-ink"
       >
         ← 公告列表
       </Link>
@@ -35,7 +35,7 @@ export default async function EditAnnouncementPage({
       <h1 className="text-xl font-bold">编辑公告</h1>
       <Notice ok={ok} error={error} />
 
-      <div className="rounded-lg border border-neutral-200 bg-white p-4">
+      <div className="rounded-xl border border-line bg-surface p-4">
         <AnnouncementForm
           action={`/api/admin/announcements/${announcement.id}`}
           announcement={announcement}

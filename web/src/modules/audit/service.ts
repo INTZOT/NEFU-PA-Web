@@ -26,7 +26,10 @@ export type AuditAction =
   | "season.update"
   | "credential.self"
   | "credential.admin"
-  | "password.admin";
+  | "password.admin"
+  | "photo.upload"
+  | "photo.update"
+  | "photo.delete";
 
 export interface AuditEntry {
   id: string;
@@ -101,4 +104,7 @@ export const ACTION_LABEL: Record<AuditAction, string> = {
   "credential.self": "自助换绑凭据",
   "credential.admin": "管理员代改凭据",
   "password.admin": "管理员代设密码",
+  "photo.upload": "上传照片",
+  "photo.update": "修改照片说明",
+  "photo.delete": "删除照片",
 };

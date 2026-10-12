@@ -1,22 +1,69 @@
 @import "tailwindcss";
 
-:root {
-  --background: #fafafa;
-  --foreground: #171717;
-}
+/*
+ * 设计令牌（Tailwind v4 的 @theme）。
+ *
+ * 为什么要有这一层：
+ *   界面原本把颜色写死在 27 个页面的 className 里（仅 text-neutral-500 就出现 126 次），
+ *   改一次配色要在几百处手改，必然漏掉几处、界面花掉。
+ *   令牌化之后，配色只在本文件里定义与调整。
+ *
+ * 取值来源：社团 logo 的颜色直方图统计（不是估的）——
+ *   主蓝 #0074CB 是 logo 中占比最大的颜色；
+ *   点缀色 #E0FD47 取自匹克球的高光。
+ */
+@theme {
+  /* ---- 品牌色 ---- */
+  --color-brand: #0074cb; /* 主色：主按钮、链接、选中态 */
+  --color-brand-strong: #0062ab; /* 悬停 / 按下，比主色深一档 */
+  --color-brand-soft: #e6f2fb; /* 浅底：选中行、次要徽章 */
+  --color-brand-ink: #0b4d7d; /* 浅底上的文字，保证对比度 */
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
+  /*
+   * 点缀色（匹克球高光的荧光黄绿）。
+   * ⚠️ 白底上对比度极低，**只能用于小面积色块**（如置顶标记、徽章），
+   *    不可用于正文、按钮文字或大面积背景 —— 否则可读性会牺牲。
+   */
+  --color-accent: #e0fd47;
+  --color-accent-ink: #3d4a05; /* 点缀底上的文字 */
+
+  /* ---- 面与线 ---- */
+  --color-canvas: #f6f8fb; /* 页面底：带一丝蓝调，比纯灰更贴合品牌 */
+  --color-surface: #ffffff; /* 卡片面 */
+  --color-surface-muted: #f2f5f9; /* 次级面：表头、内嵌块 */
+  --color-line: #e3e9f0; /* 常规边框 / 分隔线 */
+  --color-line-strong: #cbd5e1; /* 输入框等需要更清楚的边 */
+
+  /* ---- 文字 ---- */
+  --color-ink: #16202b; /* 正文：带蓝调的黑，比纯黑柔和 */
+  --color-ink-muted: #5a6675; /* 次要文字（对比度约 5.9:1，达 WCAG AA） */
+  --color-ink-subtle: #7d8896; /* 再次一级：时间戳、计数 */
+
+  /* ---- 语义色 ---- */
+  --color-ok: #157f3d;
+  --color-ok-soft: #e7f6ec;
+  --color-warn: #9a6700;
+  --color-warn-soft: #fff6e0;
+  --color-danger: #c0342c;
+  --color-danger-soft: #fdecea;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
+  background: var(--color-canvas);
+  color: var(--color-ink);
   font-family:
     system-ui,
     -apple-system,
     "PingFang SC",
     "Microsoft YaHei",
     sans-serif;
+}
+
+/*
+ * 无障碍：键盘导航时的焦点环。
+ * 鼠标点击不显示（:focus-visible 的语义），只有 Tab 导航才出现。
+ */
+:focus-visible {
+  outline: 2px solid var(--color-brand);
+  outline-offset: 2px;
 }

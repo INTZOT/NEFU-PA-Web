@@ -26,23 +26,23 @@ export default async function AuditPage() {
   return (
     <div className="space-y-5">
       <div>
-        <Link href="/admin" className="text-sm text-neutral-500 hover:text-neutral-900">
+        <Link href="/admin" className="text-sm text-ink-muted hover:text-ink">
           ← 管理后台
         </Link>
         <h1 className="mt-1 text-xl font-bold">操作记录</h1>
-        <p className="mt-1 text-sm text-neutral-500">
+        <p className="mt-1 text-sm text-ink-muted">
           记录管理动作。超级管理员账号是共用的，因此这里记录的是「账号」而非具体的人。
         </p>
       </div>
 
       {entries.length === 0 ? (
-        <p className="rounded-lg border border-neutral-200 bg-white p-6 text-center text-sm text-neutral-500">
+        <p className="rounded-xl border border-line bg-surface p-6 text-center text-sm text-ink-muted">
           还没有操作记录。
         </p>
       ) : (
-        <div className="overflow-hidden rounded-lg border border-neutral-200 bg-white">
+        <div className="overflow-hidden rounded-xl border border-line bg-surface">
           <table className="w-full text-sm">
-            <thead className="bg-neutral-50 text-left text-xs text-neutral-500">
+            <thead className="bg-canvas text-left text-xs text-ink-muted">
               <tr>
                 <th className="px-4 py-2 font-medium">时间</th>
                 <th className="px-4 py-2 font-medium">操作者</th>
@@ -52,13 +52,13 @@ export default async function AuditPage() {
             </thead>
             <tbody>
               {entries.map((e) => (
-                <tr key={e.id} className="border-t border-neutral-100">
-                  <td className="px-4 py-2 whitespace-nowrap text-neutral-500">
+                <tr key={e.id} className="border-t border-line">
+                  <td className="px-4 py-2 whitespace-nowrap text-ink-muted">
                     {formatTime(e.createdAt)}
                   </td>
                   <td className="px-4 py-2">{e.actorName}</td>
                   <td className="px-4 py-2">{ACTION_LABEL[e.action] ?? e.action}</td>
-                  <td className="px-4 py-2 text-neutral-600">{e.detail ?? "—"}</td>
+                  <td className="px-4 py-2 text-ink-muted">{e.detail ?? "—"}</td>
                 </tr>
               ))}
             </tbody>

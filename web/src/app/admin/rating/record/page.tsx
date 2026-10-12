@@ -32,12 +32,12 @@ export default async function RecordMatchPage({
 
   return (
     <div className="space-y-5">
-      <Link href="/admin/rating" className="text-sm text-neutral-500 hover:text-neutral-900">
+      <Link href="/admin/rating" className="text-sm text-ink-muted hover:text-ink">
         ← 成绩录入
       </Link>
       <div>
         <h1 className="text-xl font-bold">录入比赛结果</h1>
-        <p className="mt-1 text-sm text-neutral-500">
+        <p className="mt-1 text-sm text-ink-muted">
           选择双方成员与胜方，系统按标准 ELO 自动结算。单打每侧 1 人，双打每侧 2 人。
         </p>
       </div>
@@ -58,7 +58,7 @@ export default async function RecordMatchPage({
         <form
           action="/api/admin/rating/settle"
           method="post"
-          className="space-y-4 rounded-lg border border-neutral-200 bg-white p-4"
+          className="space-y-4 rounded-xl border border-line bg-surface p-4"
         >
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
@@ -68,7 +68,7 @@ export default async function RecordMatchPage({
                 name="eventId"
                 required
                 defaultValue={eventId ?? ""}
-                className="mt-1 w-full rounded border border-neutral-300 px-3 py-2"
+                className="mt-1 w-full rounded border border-line-strong px-3 py-2"
               >
                 <option value="">请选择</option>
                 {events.map((e) => (
@@ -85,7 +85,7 @@ export default async function RecordMatchPage({
                 id="format"
                 name="format"
                 required
-                className="mt-1 w-full rounded border border-neutral-300 px-3 py-2"
+                className="mt-1 w-full rounded border border-line-strong px-3 py-2"
               >
                 <option value="singles">单打（每侧 1 人）</option>
                 <option value="doubles">双打（每侧 2 人）</option>
@@ -104,7 +104,7 @@ export default async function RecordMatchPage({
                 multiple
                 required
                 size={6}
-                className="mt-1 w-full rounded border border-neutral-300 px-3 py-2"
+                className="mt-1 w-full rounded border border-line-strong px-3 py-2"
               >
                 {members.map((m) => (
                   <option key={m.id} value={m.id}>
@@ -124,7 +124,7 @@ export default async function RecordMatchPage({
                 multiple
                 required
                 size={6}
-                className="mt-1 w-full rounded border border-neutral-300 px-3 py-2"
+                className="mt-1 w-full rounded border border-line-strong px-3 py-2"
               >
                 {members.map((m) => (
                   <option key={m.id} value={m.id}>
@@ -146,10 +146,10 @@ export default async function RecordMatchPage({
           </div>
 
           <div className="flex items-center gap-3 pt-2">
-            <button type="submit" className="rounded bg-neutral-900 px-4 py-2 text-sm text-white">
+            <button type="submit" className="rounded bg-brand px-4 py-2 text-sm text-white">
               结算
             </button>
-            <span className="text-xs text-neutral-500">
+            <span className="text-xs text-ink-muted">
               结算后双方积分立即变化，且不可修改（可撤销最近一场）。
             </span>
           </div>

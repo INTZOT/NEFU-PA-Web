@@ -27,11 +27,11 @@ export default async function MembersAdminPage({
   return (
     <div className="space-y-5">
       <div>
-        <Link href="/admin" className="text-sm text-neutral-500 hover:text-neutral-900">
+        <Link href="/admin" className="text-sm text-ink-muted hover:text-ink">
           ← 管理后台
         </Link>
         <h1 className="mt-1 text-xl font-bold">成员与权限</h1>
-        <p className="mt-1 text-sm text-neutral-500">
+        <p className="mt-1 text-sm text-ink-muted">
           管理员由超级管理员设置。管理员可以发布公告与活动，并在自动流程失效时做人工兜底。
         </p>
       </div>
@@ -48,7 +48,7 @@ export default async function MembersAdminPage({
           return (
             <li
               key={m.id}
-              className="flex flex-wrap items-center gap-3 rounded-lg border border-neutral-200 bg-white p-4"
+              className="flex flex-wrap items-center gap-3 rounded-xl border border-line bg-surface p-4"
             >
               <div className="flex-1">
                 <div className="flex flex-wrap items-center gap-2">
@@ -58,17 +58,17 @@ export default async function MembersAdminPage({
                       m.role === "super_admin"
                         ? "rounded bg-purple-100 px-2 py-0.5 text-xs text-purple-800"
                         : m.role === "admin"
-                          ? "rounded bg-blue-100 px-2 py-0.5 text-xs text-blue-800"
-                          : "rounded bg-neutral-100 px-2 py-0.5 text-xs text-neutral-600"
+                          ? "rounded bg-brand-soft px-2 py-0.5 text-xs text-brand-ink"
+                          : "rounded bg-surface-muted px-2 py-0.5 text-xs text-ink-muted"
                     }
                   >
                     {ROLE_LABEL[m.role] ?? m.role}
                   </span>
                   {isSelf ? (
-                    <span className="text-xs text-neutral-400">（我自己）</span>
+                    <span className="text-xs text-ink-subtle">（我自己）</span>
                   ) : null}
                 </div>
-                <p className="mt-1 text-xs text-neutral-400">
+                <p className="mt-1 text-xs text-ink-subtle">
                   {m.studentId} · QQ {m.qqNumber}
                 </p>
               </div>
@@ -84,32 +84,32 @@ export default async function MembersAdminPage({
                     type="submit"
                     className={
                       m.role === "admin"
-                        ? "rounded border border-neutral-300 px-3 py-1.5 text-sm text-neutral-600 hover:text-neutral-900"
-                        : "rounded bg-neutral-900 px-3 py-1.5 text-sm text-white"
+                        ? "rounded border border-line-strong px-3 py-1.5 text-sm text-ink-muted hover:text-ink"
+                        : "rounded bg-brand px-3 py-1.5 text-sm text-white"
                     }
                   >
                     {m.role === "admin" ? "取消管理员" : "设为管理员"}
                   </button>
                 </form>
               ) : (
-                <span className="text-xs text-neutral-400">
+                <span className="text-xs text-ink-subtle">
                   {isSuper ? "超管账号不可修改" : "不能修改自己"}
                 </span>
               )}
 
               {canAct ? (
                 <details className="w-full">
-                  <summary className="cursor-pointer text-xs text-neutral-500 hover:text-neutral-900">
+                  <summary className="cursor-pointer text-xs text-ink-muted hover:text-ink">
                     人工兜底（改密码 / 换绑）
                   </summary>
-                  <div className="mt-3 grid gap-4 border-t border-neutral-100 pt-3 sm:grid-cols-2">
+                  <div className="mt-3 grid gap-4 border-t border-line pt-3 sm:grid-cols-2">
                     <form
                       action={`/api/admin/members/${m.id}/password`}
                       method="post"
                       className="space-y-2"
                     >
-                      <p className="text-xs font-medium text-neutral-700">代设临时密码</p>
-                      <p className="text-xs text-neutral-500">
+                      <p className="text-xs font-medium text-ink">代设临时密码</p>
+                      <p className="text-xs text-ink-muted">
                         用于「重置时输错新密码导致锁死」（D-16）。
                       </p>
                       <input
@@ -117,11 +117,11 @@ export default async function MembersAdminPage({
                         required
                         minLength={6}
                         placeholder="临时密码（至少 6 位）"
-                        className="w-full rounded border border-neutral-300 px-3 py-1.5 text-sm"
+                        className="w-full rounded border border-line-strong px-3 py-1.5 text-sm"
                       />
                       <button
                         type="submit"
-                        className="rounded border border-neutral-300 px-3 py-1.5 text-xs"
+                        className="rounded border border-line-strong px-3 py-1.5 text-xs"
                       >
                         设置密码
                       </button>
@@ -132,8 +132,8 @@ export default async function MembersAdminPage({
                       method="post"
                       className="space-y-2"
                     >
-                      <p className="text-xs font-medium text-neutral-700">代改凭据</p>
-                      <p className="text-xs text-neutral-500">
+                      <p className="text-xs font-medium text-ink">代改凭据</p>
+                      <p className="text-xs text-ink-muted">
                         用于「QQ 号被盗/停用」这类死局（D-16）。
                       </p>
                       <input
@@ -142,7 +142,7 @@ export default async function MembersAdminPage({
                         required
                         pattern="[0-9]{5,12}"
                         placeholder="QQ 号"
-                        className="w-full rounded border border-neutral-300 px-3 py-1.5 text-sm"
+                        className="w-full rounded border border-line-strong px-3 py-1.5 text-sm"
                       />
                       <input
                         name="studentId"
@@ -150,11 +150,11 @@ export default async function MembersAdminPage({
                         required
                         pattern="[0-9]{10}"
                         placeholder="学号"
-                        className="w-full rounded border border-neutral-300 px-3 py-1.5 text-sm"
+                        className="w-full rounded border border-line-strong px-3 py-1.5 text-sm"
                       />
                       <button
                         type="submit"
-                        className="rounded border border-neutral-300 px-3 py-1.5 text-xs"
+                        className="rounded border border-line-strong px-3 py-1.5 text-xs"
                       >
                         保存凭据
                       </button>

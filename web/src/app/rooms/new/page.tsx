@@ -15,13 +15,13 @@ export default async function NewRoomPage({
 
   return (
     <div className="space-y-5">
-      <Link href="/rooms" className="text-sm text-neutral-500 hover:text-neutral-900">
+      <Link href="/rooms" className="text-sm text-ink-muted hover:text-ink">
         ← 约球大厅
       </Link>
       <h1 className="text-xl font-bold">发起约球</h1>
       <Notice error={error} />
 
-      <div className="rounded-lg border border-neutral-200 bg-white p-4">
+      <div className="rounded-xl border border-line bg-surface p-4">
         <form action="/api/rooms" method="post" className="space-y-4">
           <div>
             <label className="block text-sm font-medium" htmlFor="timeSlot">
@@ -33,7 +33,7 @@ export default async function NewRoomPage({
               required
               maxLength={60}
               placeholder="如：周三 18:00–20:00"
-              className="mt-1 w-full rounded border border-neutral-300 px-3 py-2 outline-none focus:border-neutral-900"
+              className="mt-1 w-full rounded border border-line-strong px-3 py-2 outline-none focus:border-brand"
             />
           </div>
 
@@ -49,7 +49,7 @@ export default async function NewRoomPage({
               max={20}
               defaultValue={4}
               required
-              className="mt-1 w-full rounded border border-neutral-300 px-3 py-2 outline-none focus:border-neutral-900"
+              className="mt-1 w-full rounded border border-line-strong px-3 py-2 outline-none focus:border-brand"
             />
           </div>
 
@@ -63,18 +63,18 @@ export default async function NewRoomPage({
               rows={3}
               maxLength={200}
               placeholder="场地、水平要求、自带球拍等，都写在这里"
-              className="mt-1 w-full rounded border border-neutral-300 px-3 py-2 outline-none focus:border-neutral-900"
+              className="mt-1 w-full rounded border border-line-strong px-3 py-2 outline-none focus:border-brand"
             />
-            <p className="mt-1 text-xs text-neutral-500">
+            <p className="mt-1 text-xs text-ink-muted">
               项目刻意不设场地与水平字段，统一写在备注里（R-55）。
             </p>
           </div>
 
           <div className="flex items-center gap-3 pt-2">
-            <button type="submit" className="rounded bg-neutral-900 px-4 py-2 text-sm text-white">
+            <button type="submit" className="rounded bg-brand px-4 py-2 text-sm text-white">
               发布
             </button>
-            <Link href="/rooms" className="text-sm text-neutral-500 hover:text-neutral-900">
+            <Link href="/rooms" className="text-sm text-ink-muted hover:text-ink">
               取消
             </Link>
           </div>

@@ -30,35 +30,35 @@ export default async function AnnouncementDetailPage({
     <div className="space-y-5">
       <Link
         href="/announcements"
-        className="text-sm text-neutral-500 hover:text-neutral-900"
+        className="text-sm text-ink-muted hover:text-ink"
       >
         ← 社团公告
       </Link>
 
-      <article className="rounded-lg border border-neutral-200 bg-white p-5">
+      <article className="rounded-xl border border-line bg-surface p-5">
         <div className="flex flex-wrap items-center gap-2">
           {announcement.isPinned ? (
             <span className="rounded bg-amber-100 px-2 py-0.5 text-xs text-amber-800">置顶</span>
           ) : null}
           {announcement.category ? (
-            <span className="rounded bg-neutral-100 px-2 py-0.5 text-xs text-neutral-600">
+            <span className="rounded bg-surface-muted px-2 py-0.5 text-xs text-ink-muted">
               {announcement.category}
             </span>
           ) : null}
           {expired ? (
-            <span className="rounded bg-neutral-100 px-2 py-0.5 text-xs text-neutral-500">
+            <span className="rounded bg-surface-muted px-2 py-0.5 text-xs text-ink-muted">
               已过期
             </span>
           ) : null}
         </div>
 
         <h1 className="mt-2 text-xl font-bold">{announcement.title}</h1>
-        <p className="mt-2 text-xs text-neutral-400">
+        <p className="mt-2 text-xs text-ink-subtle">
           {formatTime(announcement.publishedAt)}
           {announcement.authorName ? ` · ${announcement.authorName}` : ""}
         </p>
 
-        <div className="mt-4 text-sm leading-relaxed whitespace-pre-wrap text-neutral-800">
+        <div className="mt-4 text-sm leading-relaxed whitespace-pre-wrap text-ink">
           {announcement.content}
         </div>
       </article>

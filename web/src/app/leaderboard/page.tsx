@@ -28,7 +28,7 @@ export default async function LeaderboardPage({
     return (
       <div className="space-y-4">
         <h1 className="text-xl font-bold">积分排行</h1>
-        <p className="rounded-lg border border-neutral-200 bg-white p-6 text-center text-sm text-neutral-500">
+        <p className="rounded-xl border border-line bg-surface p-6 text-center text-sm text-ink-muted">
           还没有赛季。管理员配置赛季起止日期后，这里会显示排行。
         </p>
       </div>
@@ -52,7 +52,7 @@ export default async function LeaderboardPage({
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
           <h1 className="text-xl font-bold">积分排行</h1>
-          <p className="mt-1 text-sm text-neutral-500">
+          <p className="mt-1 text-sm text-ink-muted">
             只统计官方比赛产生的积分（标准 ELO，K=40，零和）。个人自评分不在榜上。
           </p>
         </div>
@@ -64,8 +64,8 @@ export default async function LeaderboardPage({
                 href={buildQuery({ season: s.id, page: "1" })}
                 className={
                   s.id === selected.id
-                    ? "rounded bg-neutral-900 px-3 py-1 text-white"
-                    : "rounded border border-neutral-300 px-3 py-1 text-neutral-600 hover:text-neutral-900"
+                    ? "rounded bg-brand px-3 py-1 text-white"
+                    : "rounded border border-line-strong px-3 py-1 text-ink-muted hover:text-ink"
                 }
               >
                 {s.name}
@@ -74,7 +74,7 @@ export default async function LeaderboardPage({
             ))}
           </div>
         ) : (
-          <span className="text-sm text-neutral-500">赛季 {selected.name}</span>
+          <span className="text-sm text-ink-muted">赛季 {selected.name}</span>
         )}
       </div>
 
@@ -84,27 +84,27 @@ export default async function LeaderboardPage({
           name="q"
           defaultValue={q ?? ""}
           placeholder="按姓名或学号搜索"
-          className="rounded border border-neutral-300 px-3 py-2 text-sm outline-none focus:border-neutral-900"
+          className="rounded border border-line-strong px-3 py-2 text-sm outline-none focus:border-brand"
         />
-        <button type="submit" className="rounded border border-neutral-300 px-3 py-2 text-sm">
+        <button type="submit" className="rounded border border-line-strong px-3 py-2 text-sm">
           搜索
         </button>
         {q ? (
-          <Link href={buildQuery({ q: undefined, page: "1" })} className="text-sm text-neutral-500">
+          <Link href={buildQuery({ q: undefined, page: "1" })} className="text-sm text-ink-muted">
             清除
           </Link>
         ) : null}
-        <span className="ml-auto text-xs text-neutral-400">共 {total} 人</span>
+        <span className="ml-auto text-xs text-ink-subtle">共 {total} 人</span>
       </form>
 
       {rows.length === 0 ? (
-        <p className="rounded-lg border border-neutral-200 bg-white p-6 text-center text-sm text-neutral-500">
+        <p className="rounded-xl border border-line bg-surface p-6 text-center text-sm text-ink-muted">
           {q ? "没有匹配的成员。" : "本赛季还没有人获得积分。"}
         </p>
       ) : (
-        <div className="overflow-x-auto rounded-lg border border-neutral-200 bg-white">
+        <div className="overflow-x-auto rounded-xl border border-line bg-surface">
           <table className="w-full text-sm">
-            <thead className="bg-neutral-50 text-left text-xs text-neutral-500">
+            <thead className="bg-canvas text-left text-xs text-ink-muted">
               <tr>
                 <th className="px-3 py-2 font-medium">名次</th>
                 <th className="px-3 py-2 font-medium">姓名</th>
@@ -117,9 +117,9 @@ export default async function LeaderboardPage({
               {rows.map((r) => (
                 <tr
                   key={r.userId}
-                  className={r.userId === user.id ? "border-t border-neutral-100 bg-amber-50" : "border-t border-neutral-100"}
+                  className={r.userId === user.id ? "border-t border-line bg-amber-50" : "border-t border-line"}
                 >
-                  <td className="px-3 py-2 text-neutral-500">{r.rank}</td>
+                  <td className="px-3 py-2 text-ink-muted">{r.rank}</td>
                   <td className="px-3 py-2">
                     {r.name}
                     {r.userId === user.id ? (
@@ -127,8 +127,8 @@ export default async function LeaderboardPage({
                     ) : null}
                   </td>
                   <td className="px-3 py-2 text-right font-semibold">{r.rating}</td>
-                  <td className="px-3 py-2 text-right text-neutral-500">{r.matches}</td>
-                  <td className="px-3 py-2 text-right text-neutral-500">
+                  <td className="px-3 py-2 text-right text-ink-muted">{r.matches}</td>
+                  <td className="px-3 py-2 text-right text-ink-muted">
                     {r.winRate === null ? "—" : `${r.winRate}%`}
                   </td>
                 </tr>
@@ -141,15 +141,15 @@ export default async function LeaderboardPage({
       {pageCount > 1 ? (
         <div className="flex items-center justify-center gap-3 text-sm">
           {page > 1 ? (
-            <Link href={buildQuery({ page: String(page - 1) })} className="text-blue-600 hover:underline">
+            <Link href={buildQuery({ page: String(page - 1) })} className="text-brand hover:underline">
               ← 上一页
             </Link>
           ) : null}
-          <span className="text-neutral-500">
+          <span className="text-ink-muted">
             第 {page} / {pageCount} 页（每页 {PAGE_SIZE} 人）
           </span>
           {page < pageCount ? (
-            <Link href={buildQuery({ page: String(page + 1) })} className="text-blue-600 hover:underline">
+            <Link href={buildQuery({ page: String(page + 1) })} className="text-brand hover:underline">
               下一页 →
             </Link>
           ) : null}

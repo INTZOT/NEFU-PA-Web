@@ -29,18 +29,18 @@ export default async function RoomsPage({
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
           <h1 className="text-xl font-bold">约球大厅</h1>
-          <p className="mt-1 text-sm text-neutral-500">
+          <p className="mt-1 text-sm text-ink-muted">
             发起一个时间段，等人加入。满员后自动锁死；有人退出会重新开放；
             24 小时后自动过期。
           </p>
         </div>
         <div className="flex items-center gap-3">
-          <Link href="/rooms/mine" className="text-sm text-neutral-500 hover:text-neutral-900">
+          <Link href="/rooms/mine" className="text-sm text-ink-muted hover:text-ink">
             我的约球
           </Link>
           <Link
             href="/rooms/new"
-            className="rounded bg-neutral-900 px-4 py-2 text-sm text-white"
+            className="rounded bg-brand px-4 py-2 text-sm text-white"
           >
             发起约球
           </Link>
@@ -48,13 +48,13 @@ export default async function RoomsPage({
       </div>
 
       {rooms.length === 0 ? (
-        <p className="rounded-lg border border-neutral-200 bg-white p-6 text-center text-sm text-neutral-500">
+        <p className="rounded-xl border border-line bg-surface p-6 text-center text-sm text-ink-muted">
           暂时没有进行中的约球。点右上角「发起约球」开一个。
         </p>
       ) : (
         <ul className="space-y-3">
           {rooms.map((room) => (
-            <li key={room.id} className="rounded-lg border border-neutral-200 bg-white p-4">
+            <li key={room.id} className="rounded-xl border border-line bg-surface p-4">
               <div className="flex flex-wrap items-center gap-2">
                 <span
                   className={
@@ -69,7 +69,7 @@ export default async function RoomsPage({
                   {room.timeSlot}
                 </Link>
               </div>
-              <p className="mt-1 text-sm text-neutral-500">
+              <p className="mt-1 text-sm text-ink-muted">
                 发起人 {room.initiatorName} · 已加入 {room.capacity - room.seatsLeft}/{room.capacity}
                 {room.seatsLeft > 0 ? `（还差 ${room.seatsLeft} 人）` : ""}
                 {room.pendingCount > 0 ? ` · 待处理 ${room.pendingCount}` : ""}
@@ -77,7 +77,7 @@ export default async function RoomsPage({
                 {remaining(room.expiresAt)}
               </p>
               {room.note ? (
-                <p className="mt-1 text-sm whitespace-pre-wrap text-neutral-600">{room.note}</p>
+                <p className="mt-1 text-sm whitespace-pre-wrap text-ink-muted">{room.note}</p>
               ) : null}
             </li>
           ))}

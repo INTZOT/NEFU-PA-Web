@@ -31,14 +31,14 @@ export default async function EventAdminPage({
     <div className="space-y-5">
       <div className="flex items-center justify-between">
         <div>
-          <Link href="/admin" className="text-sm text-neutral-500 hover:text-neutral-900">
+          <Link href="/admin" className="text-sm text-ink-muted hover:text-ink">
             ← 管理后台
           </Link>
           <h1 className="mt-1 text-xl font-bold">活动管理</h1>
         </div>
         <Link
           href="/admin/events/new"
-          className="rounded bg-neutral-900 px-4 py-2 text-sm text-white"
+          className="rounded bg-brand px-4 py-2 text-sm text-white"
         >
           发布活动
         </Link>
@@ -47,18 +47,18 @@ export default async function EventAdminPage({
       <Notice ok={ok} error={error} />
 
       {events.length === 0 ? (
-        <p className="rounded-lg border border-neutral-200 bg-white p-6 text-center text-sm text-neutral-500">
+        <p className="rounded-xl border border-line bg-surface p-6 text-center text-sm text-ink-muted">
           还没有活动。
         </p>
       ) : (
         <ul className="space-y-2">
           {events.map((e) => (
-            <li key={e.id} className="rounded-lg border border-neutral-200 bg-white p-4">
+            <li key={e.id} className="rounded-xl border border-line bg-surface p-4">
               <div className="flex flex-wrap items-center gap-2">
-                <span className="rounded bg-neutral-100 px-2 py-0.5 text-xs text-neutral-600">
+                <span className="rounded bg-surface-muted px-2 py-0.5 text-xs text-ink-muted">
                   {e.format === "doubles" ? "双打" : "单打"}
                 </span>
-                <span className="rounded bg-neutral-100 px-2 py-0.5 text-xs text-neutral-600">
+                <span className="rounded bg-surface-muted px-2 py-0.5 text-xs text-ink-muted">
                   {e.status}
                 </span>
                 <Link
@@ -68,11 +68,11 @@ export default async function EventAdminPage({
                   {e.title}
                 </Link>
               </div>
-              <p className="mt-1 text-sm text-neutral-500">
+              <p className="mt-1 text-sm text-ink-muted">
                 {formatTime(e.startAt)}
                 {e.location ? ` · ${e.location}` : ""}
               </p>
-              <p className="mt-1 text-xs text-neutral-400">
+              <p className="mt-1 text-xs text-ink-subtle">
                 {e.occupied}/{e.capacity} {e.capacityUnit === "teams" ? "队" : "人"}
                 {e.waitlistCount > 0 ? ` · 候补 ${e.waitlistCount}` : ""}
               </p>

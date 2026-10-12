@@ -32,7 +32,7 @@ export function AnnouncementForm({
           required
           maxLength={100}
           defaultValue={announcement?.title ?? ""}
-          className="mt-1 w-full rounded border border-neutral-300 px-3 py-2 outline-none focus:border-neutral-900"
+          className="mt-1 w-full rounded border border-line-strong px-3 py-2 outline-none focus:border-brand"
         />
       </div>
 
@@ -46,9 +46,9 @@ export function AnnouncementForm({
           required
           rows={8}
           defaultValue={announcement?.content ?? ""}
-          className="mt-1 w-full rounded border border-neutral-300 px-3 py-2 outline-none focus:border-neutral-900"
+          className="mt-1 w-full rounded border border-line-strong px-3 py-2 outline-none focus:border-brand"
         />
-        <p className="mt-1 text-xs text-neutral-500">换行会原样保留。</p>
+        <p className="mt-1 text-xs text-ink-muted">换行会原样保留。</p>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2">
@@ -62,7 +62,7 @@ export function AnnouncementForm({
             maxLength={20}
             placeholder="如：通知 / 活动 / 积分"
             defaultValue={announcement?.category ?? ""}
-            className="mt-1 w-full rounded border border-neutral-300 px-3 py-2 outline-none focus:border-neutral-900"
+            className="mt-1 w-full rounded border border-line-strong px-3 py-2 outline-none focus:border-brand"
           />
         </div>
 
@@ -75,9 +75,9 @@ export function AnnouncementForm({
             name="expiresAt"
             type="date"
             defaultValue={expires}
-            className="mt-1 w-full rounded border border-neutral-300 px-3 py-2 outline-none focus:border-neutral-900"
+            className="mt-1 w-full rounded border border-line-strong px-3 py-2 outline-none focus:border-brand"
           />
-          <p className="mt-1 text-xs text-neutral-500">
+          <p className="mt-1 text-xs text-ink-muted">
             留空表示长期有效。过期后自动从首页与公告列表消失。
           </p>
         </div>
@@ -93,12 +93,12 @@ export function AnnouncementForm({
       </label>
 
       <div className="flex items-center gap-3 pt-2">
-        <button type="submit" className="rounded bg-neutral-900 px-4 py-2 text-sm text-white">
+        <button type="submit" className="rounded bg-brand px-4 py-2 text-sm text-white">
           {submitLabel}
         </button>
         <Link
           href="/admin/announcements"
-          className="text-sm text-neutral-500 hover:text-neutral-900"
+          className="text-sm text-ink-muted hover:text-ink"
         >
           取消
         </Link>

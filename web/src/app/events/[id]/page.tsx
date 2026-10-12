@@ -50,15 +50,15 @@ export default async function EventDetailPage({
 
   return (
     <div className="space-y-5">
-      <Link href="/events" className="text-sm text-neutral-500 hover:text-neutral-900">
+      <Link href="/events" className="text-sm text-ink-muted hover:text-ink">
         ← 社团活动
       </Link>
 
       <Notice ok={ok} error={error} />
 
-      <article className="rounded-lg border border-neutral-200 bg-white p-5">
+      <article className="rounded-xl border border-line bg-surface p-5">
         <div className="flex flex-wrap items-center gap-2">
-          <span className="rounded bg-neutral-100 px-2 py-0.5 text-xs text-neutral-600">
+          <span className="rounded bg-surface-muted px-2 py-0.5 text-xs text-ink-muted">
             {event.format === "doubles" ? "双打" : "单打"}
           </span>
         </div>
@@ -66,15 +66,15 @@ export default async function EventDetailPage({
         <h1 className="mt-2 text-xl font-bold">{event.title}</h1>
 
         <dl className="mt-3 grid gap-y-2 text-sm sm:grid-cols-2">
-          <dt className="text-neutral-500">开始时间</dt>
+          <dt className="text-ink-muted">开始时间</dt>
           <dd>{formatTime(event.startAt)}</dd>
           {event.location ? (
             <>
-              <dt className="text-neutral-500">地点</dt>
+              <dt className="text-ink-muted">地点</dt>
               <dd>{event.location}</dd>
             </>
           ) : null}
-          <dt className="text-neutral-500">名额</dt>
+          <dt className="text-ink-muted">名额</dt>
           <dd>
             {event.capacity} {event.capacityUnit === "teams" ? "队" : "人"}
             {event.remaining > 0 ? `（还剩 ${event.remaining}）` : "（已满）"}
@@ -82,24 +82,24 @@ export default async function EventDetailPage({
           </dd>
           {event.registrationDeadline ? (
             <>
-              <dt className="text-neutral-500">报名截止</dt>
+              <dt className="text-ink-muted">报名截止</dt>
               <dd>{formatTime(event.registrationDeadline)}</dd>
             </>
           ) : null}
         </dl>
 
         {event.description ? (
-          <p className="mt-4 text-sm leading-relaxed whitespace-pre-wrap text-neutral-700">
+          <p className="mt-4 text-sm leading-relaxed whitespace-pre-wrap text-ink">
             {event.description}
           </p>
         ) : null}
       </article>
 
-      <section className="rounded-lg border border-neutral-200 bg-white p-4">
+      <section className="rounded-xl border border-line bg-surface p-4">
         {!user ? (
-          <p className="text-sm text-neutral-600">
+          <p className="text-sm text-ink-muted">
             报名需要登录。
-            <Link href="/login" className="ml-1 text-blue-600 hover:underline">
+            <Link href="/login" className="ml-1 text-brand hover:underline">
               去登录 →
             </Link>
           </p>
@@ -109,13 +109,13 @@ export default async function EventDetailPage({
 
             {event.format === "doubles" ? (
               partner ? (
-                <p className="text-sm text-neutral-700">
+                <p className="text-sm text-ink">
                   搭档：<span className="font-medium">{partner.partnerName}</span>
-                  <span className="ml-2 text-xs text-neutral-500">（已确认，你俩合占一个名额）</span>
+                  <span className="ml-2 text-xs text-ink-muted">（已确认，你俩合占一个名额）</span>
                 </p>
               ) : (
-                <div className="rounded border border-neutral-200 bg-neutral-50 p-3">
-                  <p className="text-sm text-neutral-700">还没有搭档。</p>
+                <div className="rounded border border-line bg-canvas p-3">
+                  <p className="text-sm text-ink">还没有搭档。</p>
                   <form
                     action={`/api/events/${event.id}/partner`}
                     method="post"
@@ -125,16 +125,16 @@ export default async function EventDetailPage({
                       name="partnerIdent"
                       required
                       placeholder="搭档的 QQ 号或学号"
-                      className="rounded border border-neutral-300 px-3 py-1.5 text-sm outline-none focus:border-neutral-900"
+                      className="rounded border border-line-strong px-3 py-1.5 text-sm outline-none focus:border-brand"
                     />
                     <button
                       type="submit"
-                      className="rounded bg-neutral-900 px-3 py-1.5 text-sm text-white"
+                      className="rounded bg-brand px-3 py-1.5 text-sm text-white"
                     >
                       邀请搭档
                     </button>
                   </form>
-                  <p className="mt-1 text-xs text-neutral-500">
+                  <p className="mt-1 text-xs text-ink-muted">
                     对方也需要先报名这个赛事，邀请发出后由对方在个人主页确认。
                   </p>
                 </div>
@@ -147,7 +147,7 @@ export default async function EventDetailPage({
                 </button>
               </form>
             ) : (
-              <p className="text-xs text-neutral-500">
+              <p className="text-xs text-ink-muted">
                 已过取消截止时间（赛前 {CANCEL_HOURS_BEFORE} 小时）。
               </p>
             )}
@@ -155,7 +155,7 @@ export default async function EventDetailPage({
         ) : myStatus === "waitlisted" ? (
           <div className="space-y-2">
             <p className="text-sm text-amber-700">名额已满，你在候补队列中。</p>
-            <p className="text-xs text-neutral-500">
+            <p className="text-xs text-ink-muted">
               有人取消时会自动递补，无需操作。
             </p>
             {cancellable ? (
@@ -168,12 +168,12 @@ export default async function EventDetailPage({
           </div>
         ) : open ? (
           <form action={`/api/events/${event.id}/register`} method="post">
-            <button type="submit" className="rounded bg-neutral-900 px-4 py-2 text-sm text-white">
+            <button type="submit" className="rounded bg-brand px-4 py-2 text-sm text-white">
               {event.remaining > 0 ? "报名" : "名额已满，加入候补"}
             </button>
           </form>
         ) : (
-          <p className="text-sm text-neutral-500">报名已截止。</p>
+          <p className="text-sm text-ink-muted">报名已截止。</p>
         )}
       </section>
     </div>

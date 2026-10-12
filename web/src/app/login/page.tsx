@@ -11,7 +11,7 @@ export default async function LoginPage({
     <div className="mx-auto max-w-md space-y-5">
       <div>
         <h1 className="text-xl font-bold">登录</h1>
-        <p className="mt-1 text-sm text-neutral-600">可用学号或 QQ 号登录。</p>
+        <p className="mt-1 text-sm text-ink-muted">可用学号或 QQ 号登录。</p>
       </div>
 
       {error ? (
@@ -26,7 +26,7 @@ export default async function LoginPage({
           <input
             name="ident"
             required
-            className="w-full rounded border border-neutral-300 px-3 py-2 outline-none focus:border-neutral-900"
+            className="w-full rounded border border-line-strong px-3 py-2 outline-none focus:border-brand"
           />
         </label>
 
@@ -36,22 +36,22 @@ export default async function LoginPage({
             name="password"
             type="password"
             required
-            className="w-full rounded border border-neutral-300 px-3 py-2 outline-none focus:border-neutral-900"
+            className="w-full rounded border border-line-strong px-3 py-2 outline-none focus:border-brand"
           />
         </label>
 
-        <button type="submit" className="w-full rounded bg-neutral-900 px-4 py-2 text-white">
+        <button type="submit" className="w-full rounded bg-brand px-4 py-2 text-white">
           登录
         </button>
       </form>
 
-      <div className="space-y-1 text-sm text-neutral-600">
+      <div className="space-y-1 text-sm text-ink-muted">
         <p>
           忘记密码？在 QQ 群私聊机器人发送「重置密码」即可。
         </p>
         <p>
           还没有账号？
-          <Link href="/register" className="text-blue-600 hover:underline">去注册</Link>
+          <Link href="/register" className="text-brand hover:underline">去注册</Link>
         </p>
       </div>
     </div>

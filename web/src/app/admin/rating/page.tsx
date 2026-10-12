@@ -35,11 +35,11 @@ export default async function RatingAdminPage({
   return (
     <div className="space-y-5">
       <div>
-        <Link href="/admin" className="text-sm text-neutral-500 hover:text-neutral-900">
+        <Link href="/admin" className="text-sm text-ink-muted hover:text-ink">
           ← 管理后台
         </Link>
         <h1 className="mt-1 text-xl font-bold">成绩录入</h1>
-        <p className="mt-1 text-sm text-neutral-500">
+        <p className="mt-1 text-sm text-ink-muted">
           录入官方比赛结果，系统按标准 ELO（K=40）自动结算，双方增减为零和。
         </p>
       </div>
@@ -52,9 +52,9 @@ export default async function RatingAdminPage({
         </p>
       ) : null}
 
-      <section className="rounded-lg border border-neutral-200 bg-white p-4">
+      <section className="rounded-xl border border-line bg-surface p-4">
         <h2 className="font-semibold">撤销最近一场</h2>
-        <p className="mt-1 text-xs text-neutral-500">
+        <p className="mt-1 text-xs text-ink-muted">
           录错时可以撤销，但只能撤最近一场 —— ELO 是链式的，撤销中间某场会让其后所有场次失去依据。
         </p>
         <form action="/api/admin/rating/revoke" method="post" className="mt-3">
@@ -67,7 +67,7 @@ export default async function RatingAdminPage({
         </form>
 
         {recent.length > 0 ? (
-          <ul className="mt-3 space-y-1 text-xs text-neutral-500">
+          <ul className="mt-3 space-y-1 text-xs text-ink-muted">
             {recent.slice(0, 5).map((m) => (
               <li key={m.id}>
                 {formatTime(m.createdAt)} · {m.eventTitle} ·{" "}
@@ -77,22 +77,22 @@ export default async function RatingAdminPage({
             ))}
           </ul>
         ) : (
-          <p className="mt-3 text-xs text-neutral-400">本赛季还没有已结算的对局。</p>
+          <p className="mt-3 text-xs text-ink-subtle">本赛季还没有已结算的对局。</p>
         )}
       </section>
 
-      <section className="rounded-lg border border-neutral-200 bg-white p-4">
+      <section className="rounded-xl border border-line bg-surface p-4">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div>
             <h2 className="font-semibold">逐场录入</h2>
-            <p className="mt-1 text-xs text-neutral-500">
+            <p className="mt-1 text-xs text-ink-muted">
               选择赛事、赛制、双方成员与胜方，系统自动结算。
               当前有 {events.length} 个已发布赛事。
             </p>
           </div>
           <Link
             href="/admin/rating/record"
-            className="rounded bg-neutral-900 px-4 py-2 text-sm text-white"
+            className="rounded bg-brand px-4 py-2 text-sm text-white"
           >
             录入一场
           </Link>
