@@ -4,6 +4,7 @@ import { listPublished } from "@/modules/announcement/service";
 import { listPublished as listEvents } from "@/modules/event/service";
 import { Badge, ButtonLink, Card } from "@/components/ui";
 import { listFeatured } from "@/modules/photo/service";
+import { HeroCarousel } from "@/components/HeroCarousel";
 
 function formatDate(value: string): string {
   return new Date(value).toLocaleDateString("zh-CN", {
@@ -28,15 +29,16 @@ export default async function HomePage() {
   return (
     <div className="space-y-6">
       {/* ---- Hero ---- */}
-      <section className="relative overflow-hidden rounded-2xl bg-brand px-6 py-10 text-white sm:px-10 sm:py-14">
-        {/* 装饰：右下角的荧光色块，呼应匹克球的高光 */}
-        <div
-          aria-hidden
-          className="pointer-events-none absolute -right-16 -bottom-20 h-56 w-56 rounded-full bg-accent/25 blur-2xl"
-        />
+      <section className="relative overflow-hidden rounded-2xl bg-brand">
+        {/* 背景：精选照片轮播（无精选照片时退回纯品牌蓝） */}
+        <HeroCarousel filenames={photos.map((p) => p.filename)} />
 
-        <div className="relative flex flex-col items-start gap-6 sm:flex-row sm:items-center">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
+        {/* 内容放在毛玻璃卡片里：这是压在照片上的文字能看清的关键保障 */}
+        {/* 毛玻璃卡片：半透明白 + 模糊背景 + 亮边框，让它明确浮在照片之上 */}
+        {/* text-white：卡片里全部用白字。原有的 text-white 在改造中丢失过，导致标题变深色、
+            压在照片上不易读。照片上的文字用白字是最稳的选择。 */}
+        <div className="relative m-4 flex min-h-[19rem] items-center rounded-2xl border border-white/30 bg-white/15 p-6 text-white shadow-[0_8px_32px_rgba(0,0,0,0.25)] backdrop-blur-lg sm:m-6 sm:min-h-[21rem] sm:p-8">
+          <div className="flex flex-col items-start gap-6 sm:flex-row sm:items-center">
           <img
             src="/logo-192.png"
             alt="东北林业大学匹克球协会 logo"
@@ -82,6 +84,7 @@ export default async function HomePage() {
                 </>
               )}
             </div>
+          </div>
           </div>
         </div>
       </section>
