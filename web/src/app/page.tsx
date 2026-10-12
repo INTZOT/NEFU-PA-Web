@@ -1,8 +1,18 @@
 import Link from "next/link";
 import { getCurrentUser } from "@/lib/session";
+import { listPublished } from "@/modules/announcement/service";
+
+function formatDate(value: string): string {
+  return new Date(value).toLocaleDateString("zh-CN", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  });
+}
 
 export default async function HomePage() {
   const user = await getCurrentUser();
+  const announcements = await listPublished(3);
 
   return (
     <div className="space-y-6">
@@ -17,7 +27,9 @@ export default async function HomePage() {
       <section className="rounded-lg border border-neutral-200 bg-white p-4">
         {user ? (
           <div className="space-y-2">
-            <p>你好，<span className="font-semibold">{user.name}</span></p>
+            <p>
+              你好，<span className="font-semibold">{user.name}</span>
+            </p>
             <Link href="/me" className="inline-block text-sm text-blue-600 hover:underline">
               进入个人主页 →
             </Link>
@@ -40,12 +52,37 @@ export default async function HomePage() {
         )}
       </section>
 
-      <section className="rounded-lg border border-dashed border-neutral-300 p-4 text-sm text-neutral-500">
-        <p className="font-medium text-neutral-700">当前进度</p>
-        <p className="mt-1">
-          阶段 2「账号体系」正在搭建。公告、活动、约球与积分排行将在后续阶段开放。
-        </p>
-      </section>
+      {announcements.length > 0 ? (
+        <section className="space-y-3">
+          <div className="flex items-center justify-between">
+            <h2 className="font-semibold">最新公告</h2>
+            <Link
+              href="/announcements"
+              className="text-sm text-neutral-500 hover:text-neutral-900"
+            >
+              全部公告 →
+            </Link>
+          </div>
+          <ul className="space-y-3">
+            {announcements.map((a) => (
+              <li key={a.id} className="rounded-lg border border-neutral-200 bg-white p-4">
+                <div className="flex flex-wrap items-center gap-2">
+                  {a.isPinned ? (
+                    <span className="rounded bg-amber-100 px-2 py-0.5 text-xs text-amber-800">
+                      置顶
+                    </span>
+                  ) : null}
+                  <h3 className="font-medium">{a.title}</h3>
+                </div>
+                <p className="mt-1 line-clamp-3 text-sm whitespace-pre-wrap text-neutral-600">
+                  {a.content}
+                </p>
+                <p className="mt-2 text-xs text-neutral-400">{formatDate(a.publishedAt)}</p>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
     </div>
   );
 }

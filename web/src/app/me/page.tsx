@@ -65,7 +65,12 @@ export default async function MePage({
           <dt className="text-neutral-500">角色</dt>
           <dd>{ROLE_LABEL[user.role] ?? user.role}</dd>
           <dt className="text-neutral-500">学号</dt>
-          <dd className="text-neutral-400">仅用于登录，不对外展示</dd>
+          <dd>
+            {user.studentId}
+            <span className="ml-2 text-xs text-neutral-400">
+              登录用；不对其他成员展示（R-53）
+            </span>
+          </dd>
         </dl>
       </section>
 
