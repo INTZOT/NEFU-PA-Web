@@ -29,7 +29,8 @@ export type AuditAction =
   | "password.admin"
   | "photo.upload"
   | "photo.update"
-  | "photo.delete";
+  | "photo.delete"
+  | "site.update";
 
 export interface AuditEntry {
   id: string;
@@ -107,4 +108,5 @@ export const ACTION_LABEL: Record<AuditAction, string> = {
   "photo.upload": "上传照片",
   "photo.update": "修改照片说明",
   "photo.delete": "删除照片",
+  "site.update": "修改首页文案",
 };

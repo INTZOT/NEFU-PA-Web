@@ -75,6 +75,16 @@ export default async function AdminPage() {
         ) : null}
 
         <Link
+          href="/admin/home"
+          className="rounded-lg border border-line bg-surface p-4 transition hover:border-brand"
+        >
+          <h2 className="font-semibold">首页文案</h2>
+          <p className="mt-1 text-sm text-ink-muted">
+            修改首页顶部的大标题与副标题
+          </p>
+        </Link>
+
+        <Link
           href="/admin/photos"
           className="rounded-lg border border-line bg-surface p-4 transition hover:border-brand"
         >

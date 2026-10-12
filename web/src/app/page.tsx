@@ -4,6 +4,7 @@ import { listPublished } from "@/modules/announcement/service";
 import { listPublished as listEvents } from "@/modules/event/service";
 import { Badge, ButtonLink, Card } from "@/components/ui";
 import { listFeatured } from "@/modules/photo/service";
+import { getValue } from "@/modules/setting/service";
 import { HeroCarousel } from "@/components/HeroCarousel";
 
 function formatDate(value: string): string {
@@ -20,6 +21,12 @@ export default async function HomePage() {
     listPublished(3),
     listEvents(),
     listFeatured(6),
+  ]);
+
+  // 首页文案可由管理员在 /admin/home 修改（取不到时回退到代码里的默认值）
+  const [heroTitle, heroSubtitle] = await Promise.all([
+    getValue("home.hero.title"),
+    getValue("home.hero.subtitle"),
   ]);
 
   const upcoming = events
@@ -47,12 +54,9 @@ export default async function HomePage() {
             className="h-24 w-24 shrink-0 drop-shadow-lg sm:h-28 sm:w-28"
           />
           <div>
-            <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">
-              东北林业大学匹克球协会
-            </h1>
-            <p className="mt-2 max-w-xl text-sm leading-relaxed text-white/90 sm:text-base">
-              欢迎加入匹克球协会。这里发布社团公告与活动信息；成员登录后可使用约球大厅、
-              活动报名与积分排行。
+            <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">{heroTitle}</h1>
+            <p className="mt-2 max-w-xl text-sm leading-relaxed whitespace-pre-wrap text-white/90 sm:text-base">
+              {heroSubtitle}
             </p>
             <div className="mt-5 flex flex-wrap gap-3">
               {user ? (
