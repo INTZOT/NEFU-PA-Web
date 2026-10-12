@@ -16,7 +16,10 @@ export type AuditAction =
   | "announcement.create"
   | "announcement.update"
   | "announcement.delete"
-  | "club.update";
+  | "club.update"
+  | "event.create"
+  | "event.update"
+  | "event.checkin";
 
 export interface AuditEntry {
   id: string;
@@ -81,4 +84,7 @@ export const ACTION_LABEL: Record<AuditAction, string> = {
   "announcement.update": "修改公告",
   "announcement.delete": "删除公告",
   "club.update": "修改社团介绍",
+  "event.create": "发布活动",
+  "event.update": "修改活动",
+  "event.checkin": "活动签到",
 };

@@ -62,12 +62,15 @@ export default async function AdminPage() {
           </Link>
         ) : null}
 
-        <div className="rounded-lg border border-dashed border-neutral-200 p-4">
-          <h2 className="font-semibold text-neutral-400">赛事与活动</h2>
-          <p className="mt-1 text-sm text-neutral-400">
-            尚未实现（阶段 5）
+        <Link
+          href="/admin/events"
+          className="rounded-lg border border-neutral-200 bg-white p-4 transition hover:border-neutral-900"
+        >
+          <h2 className="font-semibold">社团活动</h2>
+          <p className="mt-1 text-sm text-neutral-500">
+            发布赛事、查看报名与候补
           </p>
-        </div>
+        </Link>
       </div>
     </div>
   );

@@ -30,6 +30,9 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             <Link href="/announcements" className="text-neutral-600 hover:text-neutral-900">
               公告
             </Link>
+            <Link href="/events" className="text-neutral-600 hover:text-neutral-900">
+              活动
+            </Link>
             <span className="flex-1" />
             {user ? (
               <>

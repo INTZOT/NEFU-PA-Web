@@ -8,7 +8,7 @@
  *   - 连接池**惰性创建**：构建阶段没有数据库也应能编译通过
  */
 
-import { Pool, type QueryResultRow } from "pg";
+import { Pool, type PoolClient, type QueryResultRow } from "pg";
 
 declare global {
   // 开发模式热重载会重复求值模块，用全局变量避免连接池泄漏
@@ -47,4 +47,28 @@ export async function queryOne<T extends QueryResultRow = QueryResultRow>(
 ): Promise<T | null> {
   const rows = await query<T>(text, params);
   return rows[0] ?? null;
+}
+
+/**
+ * 在一个事务里执行一段逻辑。
+ *
+ * 为什么需要它：活动报名的「计数 → 插入」必须原子完成，
+ * 否则两人同时报名时会都读到「还剩 1 个名额」，导致超额。
+ * 事务内的调用方应自行对关键行加锁（SELECT ... FOR UPDATE）。
+ */
+export async function withTransaction<T>(
+  fn: (client: PoolClient) => Promise<T>,
+): Promise<T> {
+  const client = await getPool().connect();
+  try {
+    await client.query("BEGIN");
+    const result = await fn(client);
+    await client.query("COMMIT");
+    return result;
+  } catch (error) {
+    await client.query("ROLLBACK");
+    throw error;
+  } finally {
+    client.release();
+  }
 }
