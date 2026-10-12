@@ -4,25 +4,16 @@ import { getCurrentUser } from "@/lib/session";
 import { queryOne } from "@/lib/db";
 import { listPendingForUser } from "@/modules/event/pairing";
 import { Notice } from "@/components/Notice";
+import { SelfRatingSlider } from "@/components/SelfRatingSlider";
 
-// 五档话术：仅作为选择自评分时的参考，不跟随展示（D-21）
-const TIERS = [
-  { max: 200, label: "小白" },
-  { max: 400, label: "新手" },
-  { max: 600, label: "熟手" },
-  { max: 800, label: "高手" },
-  { max: 1000, label: "大师" },
-];
+// 五档话术已移入 SelfRatingSlider —— 它只在「选择自评分」时出现，
+// 页面其余位置不跟随展示（D-21）。
 
 const ROLE_LABEL: Record<string, string> = {
   member: "成员",
   admin: "管理员",
   super_admin: "超级管理员",
 };
-
-function tierOf(value: number): string {
-  return TIERS.find((t) => value <= t.max)?.label ?? "大师";
-}
 
 export default async function MePage({
   searchParams,
@@ -140,32 +131,7 @@ export default async function MePage({
           这是你对自己水平的评估，用于约球时供他人参考。它不随比赛结果变化，可随时修改。
         </p>
 
-        <form action="/api/me/self-rating" method="post" className="mt-3 space-y-3">
-          <div className="flex items-center gap-3">
-            <input
-              type="range"
-              name="selfRating"
-              min="0"
-              max="1000"
-              step="10"
-              defaultValue={user.selfRating}
-              className="flex-1"
-            />
-            <span className="text-sm text-ink-muted">0–1000</span>
-          </div>
-          <p className="text-xs text-ink-muted">
-            档位参考：小白 0–200 · 新手 200–400 · 熟手 400–600 · 高手 600–800 · 大师 800–1000
-          </p>
-          <button type="submit" className="rounded bg-brand px-4 py-2 text-sm text-white">
-            保存
-          </button>
-        </form>
-
-        <p className="mt-3 text-sm">
-          当前自评分：
-          <span className="font-semibold">{user.selfRating}</span>
-          <span className="ml-2 text-ink-muted">（{tierOf(user.selfRating)}）</span>
-        </p>
+        <SelfRatingSlider initial={user.selfRating} />
       </section>
 
       <section id="credentials" className="rounded-xl border border-line bg-surface p-4">
