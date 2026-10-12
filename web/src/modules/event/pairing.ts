@@ -54,6 +54,8 @@ export interface PendingInvite {
   pairingId: string;
   eventId: string;
   eventTitle: string;
+  /** 搭档的 user id —— 用于把姓名链到成员主页。 */
+  partnerId: string;
   partnerName: string;
   proposedBy: "member" | "admin";
 }
@@ -63,12 +65,14 @@ export async function listPendingForUser(userId: string): Promise<PendingInvite[
     pairing_id: string;
     event_id: string;
     event_title: string;
+    partner_id: string;
     partner_name: string;
     proposed_by: "member" | "admin";
   }>(
     `SELECT p.id   AS pairing_id,
             e.id   AS event_id,
             e.title AS event_title,
+            u.id   AS partner_id,
             u.name AS partner_name,
             p.proposed_by
        FROM pairings p
@@ -85,6 +89,7 @@ export async function listPendingForUser(userId: string): Promise<PendingInvite[
     pairingId: r.pairing_id,
     eventId: r.event_id,
     eventTitle: r.event_title,
+    partnerId: r.partner_id,
     partnerName: r.partner_name,
     proposedBy: r.proposed_by,
   }));
@@ -94,9 +99,9 @@ export async function listPendingForUser(userId: string): Promise<PendingInvite[
 export async function getPartner(
   eventId: string,
   userId: string,
-): Promise<{ pairingId: string; partnerName: string } | null> {
-  const row = await queryOne<{ pairing_id: string; partner_name: string }>(
-    `SELECT p.id AS pairing_id, u.name AS partner_name
+): Promise<{ pairingId: string; partnerId: string; partnerName: string } | null> {
+  const row = await queryOne<{ pairing_id: string; partner_id: string; partner_name: string }>(
+    `SELECT p.id AS pairing_id, u.id AS partner_id, u.name AS partner_name
        FROM pairings p
        JOIN users u
          ON u.id = CASE WHEN p.user_a_id = $2 THEN p.user_b_id ELSE p.user_a_id END
@@ -105,7 +110,9 @@ export async function getPartner(
         AND (p.user_a_id = $2 OR p.user_b_id = $2)`,
     [eventId, userId],
   );
-  return row ? { pairingId: row.pairing_id, partnerName: row.partner_name } : null;
+  return row
+    ? { pairingId: row.pairing_id, partnerId: row.partner_id, partnerName: row.partner_name }
+    : null;
 }
 
 export type PairingResult = { ok: true } | { ok: false; error: string };

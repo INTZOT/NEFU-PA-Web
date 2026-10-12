@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/session";
 import { listSeasons, getActiveSeason, getLeaderboard, PAGE_SIZE } from "@/modules/rating/leaderboard";
 import { archiveDue } from "@/modules/rating/season";
+import { MemberLink } from "@/components/MemberLink";
 
 export const metadata = { title: "积分排行" };
 
@@ -121,7 +122,7 @@ export default async function LeaderboardPage({
                 >
                   <td className="px-3 py-2 text-ink-muted">{r.rank}</td>
                   <td className="px-3 py-2">
-                    {r.name}
+                    <MemberLink userId={r.userId} name={r.name} />
                     {r.userId === user.id ? (
                       <span className="ml-2 text-xs text-amber-700">（我）</span>
                     ) : null}

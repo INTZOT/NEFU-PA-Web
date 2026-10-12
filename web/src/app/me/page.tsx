@@ -9,6 +9,7 @@ import { getActiveSeason, getMyRank } from "@/modules/rating/leaderboard";
 import { BIO_MAX } from "@/modules/profile/service";
 import { Notice } from "@/components/Notice";
 import { SelfRatingSlider } from "@/components/SelfRatingSlider";
+import { MemberLink } from "@/components/MemberLink";
 
 const ROLE_LABEL: Record<string, string> = {
   member: "成员",
@@ -107,8 +108,8 @@ export default async function MePage({
                 <span className="font-medium">双打搭档邀请</span>
                 <span className="ml-2 text-ink-muted">
                   {inv.proposedBy === "admin" ? "管理员指派：" : ""}
-                  {inv.partnerName}
                 </span>
+                <MemberLink userId={inv.partnerId} name={inv.partnerName} />
               </p>
               <p className="text-xs text-ink-muted">
                 活动：

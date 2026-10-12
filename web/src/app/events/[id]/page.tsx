@@ -5,6 +5,7 @@ import { getById, isRegistrationOpen, canCancel, CANCEL_HOURS_BEFORE } from "@/m
 import { getPartner } from "@/modules/event/pairing";
 import { queryOne } from "@/lib/db";
 import { Notice } from "@/components/Notice";
+import { MemberLink } from "@/components/MemberLink";
 
 function formatTime(value: string): string {
   return new Date(value).toLocaleString("zh-CN", {
@@ -110,7 +111,8 @@ export default async function EventDetailPage({
             {event.format === "doubles" ? (
               partner ? (
                 <p className="text-sm text-ink">
-                  搭档：<span className="font-medium">{partner.partnerName}</span>
+                  搭档：
+                  <MemberLink userId={partner.partnerId} name={partner.partnerName} className="font-medium" />
                   <span className="ml-2 text-xs text-ink-muted">（已确认，你俩合占一个名额）</span>
                 </p>
               ) : (

@@ -3,6 +3,7 @@ import { notFound, redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/session";
 import { getById, getRoomDetail, ROOM_TTL_HOURS } from "@/modules/room/service";
 import { Notice } from "@/components/Notice";
+import { MemberLink } from "@/components/MemberLink";
 
 const STATUS_LABEL: Record<string, string> = {
   open: "招募中",
@@ -58,7 +59,8 @@ export default async function RoomDetailPage({
         </div>
         <h1 className="mt-2 text-xl font-bold">{room.timeSlot}</h1>
         <p className="mt-2 text-sm text-ink-muted">
-          发起人 {room.initiatorName} · 已加入 {room.capacity - room.seatsLeft}/{room.capacity}
+          发起人 <MemberLink userId={room.initiatorId} name={room.initiatorName} /> · 已加入{" "}
+          {room.capacity - room.seatsLeft}/{room.capacity}
           {room.seatsLeft > 0 ? `（还差 ${room.seatsLeft} 人）` : ""}
         </p>
         <p className="mt-1 text-xs text-ink-subtle">
@@ -74,7 +76,7 @@ export default async function RoomDetailPage({
         <ul className="mt-2 space-y-1 text-sm">
           {detail.members.map((m) => (
             <li key={m.userId} className="flex items-center gap-2">
-              <span className="font-medium">{m.name}</span>
+              <MemberLink userId={m.userId} name={m.name} className="font-medium" />
               {m.isInitiator ? (
                 <span className="rounded bg-surface-muted px-2 py-0.5 text-xs text-ink-muted">
                   发起人
@@ -129,7 +131,7 @@ export default async function RoomDetailPage({
                 className="flex flex-wrap items-center gap-3 rounded border border-amber-200 bg-surface p-3"
               >
                 <div className="flex-1 text-sm">
-                  <span className="font-medium">{a.name}</span>
+                  <MemberLink userId={a.userId} name={a.name} className="font-medium" />
                   <span className="ml-2 text-xs text-ink-subtle">自评分 {a.selfRating}</span>
                 </div>
                 <form

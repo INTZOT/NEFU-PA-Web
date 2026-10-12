@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/session";
 import { listActive } from "@/modules/room/service";
+import { MemberLink } from "@/components/MemberLink";
 
 export const metadata = { title: "约球大厅" };
 
@@ -70,7 +71,8 @@ export default async function RoomsPage({
                 </Link>
               </div>
               <p className="mt-1 text-sm text-ink-muted">
-                发起人 {room.initiatorName} · 已加入 {room.capacity - room.seatsLeft}/{room.capacity}
+                发起人 <MemberLink userId={room.initiatorId} name={room.initiatorName} /> · 已加入{" "}
+                {room.capacity - room.seatsLeft}/{room.capacity}
                 {room.seatsLeft > 0 ? `（还差 ${room.seatsLeft} 人）` : ""}
                 {room.pendingCount > 0 ? ` · 待处理 ${room.pendingCount}` : ""}
                 {" · "}
