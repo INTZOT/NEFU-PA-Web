@@ -11,6 +11,11 @@ COPY . .
 # 构建期不需要真实数据库：页面都是动态渲染，
 # 连接池也是惰性创建，这里给一个占位值让编译通过即可。
 ENV DATABASE_URL=postgres://placeholder:placeholder@127.0.0.1:5432/placeholder
+
+# ⚠️ 限制 Node 堆内存：部署机内存很小（1.6G），
+#    不限制时 Next.js 构建会吃满内存并拖垮整台机器。
+ENV NODE_OPTIONS=--max-old-space-size=640
+
 # standalone 输出：运行阶段只需 node server.js
 RUN npm run build
 

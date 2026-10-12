@@ -40,8 +40,11 @@ services:
     networks: [backend]
 
   # ---------- 网站 ----------
+  # 注意：本服务**在服务器上构建会耗尽内存**（该机器仅 1.6G，且同时运行其他项目）。
+  # 正确做法见 deploy.sh：先 docker build 出镜像，再 docker compose up -d（不加 --build）。
   web:
     build: ./web
+    image: nefu-pa-web-web:local
     restart: unless-stopped
     environment:
       NODE_ENV: production
