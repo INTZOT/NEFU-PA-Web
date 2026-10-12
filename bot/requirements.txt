@@ -1,0 +1,4 @@
+# 机器人服务依赖（刻意保持最小）
+# 不引入机器人框架：只有三条流程，框架是负担（见 docs/p3-options.md）
+websockets==15.0.1
+psycopg[binary]==3.2.9

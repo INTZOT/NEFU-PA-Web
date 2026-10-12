@@ -77,6 +77,12 @@ services:
       # 共享规则接口：密码加密与邀请码生成只在网站实现（见 docs/p3-blueprint.md 第三节）
       SHARED_RULES_URL: ${SHARED_RULES_URL:-http://web:3000/api/internal/shared-rules}
       SHARED_RULES_TOKEN: ${SHARED_RULES_TOKEN:?请在 .env 中设置 SHARED_RULES_TOKEN}
+      # 注册链接用（发给用户的文案里会带上它）
+      SITE_URL: ${SITE_URL:-https://nefupa.intzot.asia}
+      # 反向 WebSocket 监听端口，NapCat 作为客户端连过来
+      BOT_WS_PORT: "3002"
+      ONEBOT_ACCESS_TOKEN: ${ONEBOT_ACCESS_TOKEN:-}
+      BOT_HEALTH_PORT: "8000"
     depends_on:
       db:
         condition: service_healthy
@@ -87,7 +93,8 @@ services:
   #       因其涉及交互式登录，默认不随 compose 一起启动；
   #       首次部署请单独运行，详见 README「QQ 协议端」一节。
   napcat:
-    image: mlikiowa/napcat-docker:latest
+    # 通过镜像代理拉取（daocloud 对非 library 镜像频繁 502）
+    image: docker.1ms.run/mlikiowa/napcat-docker:latest
     restart: unless-stopped
     profiles: [napcat]
     environment:
