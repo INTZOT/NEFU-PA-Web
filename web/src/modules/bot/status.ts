@@ -1,0 +1,77 @@
+/**
+ * 机器人运行状态（供管理面板使用）。
+ *
+ * 为什么需要它：
+ *   机器人曾停摆近 4 小时而无人察觉 —— 因为没有任何地方能看到它的状态。
+ *   而 bot 原先的 /healthz **永远返回 200**，那个健康检查是假的。
+ *
+ * 状态从哪来：
+ *   **唯一真相源是 bot 与 NapCat 之间 WebSocket 的连接状态**，由 bot 上报。
+ *   网站无法自行判断（两个独立容器）。
+ *
+ * NapCat 的登录态无法直接查询，只能**旁证**：
+ *   它等待扫码时会持续把新二维码写到 /app/napcat/cache/qrcode.png。
+ *   因此「未连接 + 二维码是新的」基本可以断定是掉登录、且现在就能扫。
+ */
+
+import { readFile, stat } from "node:fs/promises";
+
+const BOT_HEALTH_URL = process.env.BOT_HEALTH_URL ?? "http://bot:8000";
+const QR_PATH = process.env.NAPCAT_QR_PATH ?? "/app/napcat-cache/qrcode.png";
+
+/** 超过这个时长没更新的二维码视为过期（NapCat 约每 2 分钟写一次）。 */
+const QR_FRESH_MS = 5 * 60 * 1000;
+
+export interface BotStatus {
+  /** 协议端（NapCat）是否已连接到 bot。 */
+  connected: boolean;
+  /** 是否查到了 bot 的状态接口。查不到 = bot 本身可能没起来。 */
+  reachable: boolean;
+  /** 二维码是否可读。 */
+  hasQr: boolean;
+  /** 二维码是否新鲜（新鲜才值得展示）。 */
+  qrFresh: boolean;
+  /** 二维码图片字节。仅在需要展示时返回。 */
+  qr: Buffer | null;
+}
+
+async function fetchConnected(): Promise<{ reachable: boolean; connected: boolean }> {
+  try {
+    const res = await fetch(`${BOT_HEALTH_URL}/status`, {
+      signal: AbortSignal.timeout(3000),
+      cache: "no-store",
+    });
+    if (!res.ok) return { reachable: true, connected: false };
+    const data = (await res.json()) as { connected?: boolean };
+    return { reachable: true, connected: data.connected === true };
+  } catch {
+    // 连不上 bot 本身
+    return { reachable: false, connected: false };
+  }
+}
+
+async function readQr(): Promise<{ hasQr: boolean; qrFresh: boolean; qr: Buffer | null }> {
+  try {
+    const info = await stat(QR_PATH);
+    const fresh = Date.now() - info.mtimeMs < QR_FRESH_MS;
+    // 只有新鲜且可能要用时才读内容，避免做无谓的 IO
+    const qr = fresh ? await readFile(QR_PATH) : null;
+    return { hasQr: true, qrFresh: fresh, qr };
+  } catch {
+    return { hasQr: false, qrFresh: false, qr: null };
+  }
+}
+
+export async function getBotStatus(): Promise<BotStatus> {
+  const [health, qr] = await Promise.all([fetchConnected(), readQr()]);
+
+  return {
+    connected: health.connected,
+    reachable: health.reachable,
+    hasQr: qr.hasQr,
+    qrFresh: qr.qrFresh,
+    // 已连接时不需要二维码 —— 不把它读进内存、也不返回给页面
+
+    qr: health.connected ? null : qr.qr,
+  };
+}

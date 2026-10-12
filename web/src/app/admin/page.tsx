@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/session";
 import { canEnterAdmin, isSuperAdmin } from "@/lib/roles";
+import { BotStatusCard } from "@/components/BotStatusCard";
 
 export default async function AdminPage() {
   const user = await getCurrentUser();
@@ -16,6 +17,9 @@ export default async function AdminPage() {
           当前登录：{user.name}
         </p>
       </div>
+
+      {/* 机器人状态：**仅超管可见** —— 掉线时这里会出现登录二维码 */}
+      {isSuperAdmin(user) ? <BotStatusCard /> : null}
 
       <div className="grid gap-3 sm:grid-cols-2">
         <Link

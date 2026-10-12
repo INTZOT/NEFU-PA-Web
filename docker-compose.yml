@@ -59,10 +59,16 @@ services:
       SUPER_ADMIN_QQ: ${SUPER_ADMIN_QQ:-}
       # 社团照片的存放目录（D-31）。必须挂载卷，否则照片会随着镜像更新丢失。
       UPLOAD_DIR: /app/uploads
+      # 机器人健康检查地址：用于管理面板显示「机器人是否在线」。
+      BOT_HEALTH_URL: http://bot:8000
+      # NapCat 二维码文件所在目录（只读挂载）。掉线时管理面板据此显示二维码。
+      NAPCAT_QR_PATH: /app/napcat-cache/qrcode.png
     volumes:
       # 社团照片（D-31）：命名卷，与数据库同级别的持久化。
       # 为什么不放 web/public：那是构建进镜像的，下次部署照片会全部消失。
       - uploads_data:/app/uploads
+      # NapCat 二维码：**只读**挂载 —— web 只需读取，给它写权限没有必要。
+      - napcat_cache:/app/napcat-cache:ro
     depends_on:
       db:
         condition: service_healthy
@@ -77,6 +83,13 @@ services:
   # ---------- QQ 机器人服务 ----------
   bot:
     build: ./bot
+    # ⚠️ 必须显式指定镜像名。
+    #
+    # 只写 `build:` 时，compose 会自行生成镜像名（项目名-服务名，即 nefu-pa-web-bot），
+    # 与部署流程里 `docker build -t nefu-pa-web-bot:local` 构建的名字**对不上**。
+    # 后果：`docker compose up -d --force-recreate bot` 会继续复用**上一次的旧镜像**，
+    # 新代码根本没被部署 —— 而且不报任何错，属于静默失败。（web 服务早已显式指定，故无此问题。）
+    image: nefu-pa-web-bot:local
     restart: unless-stopped
     environment:
       # 机器人使用受限数据库账号（见 .env.example 说明）

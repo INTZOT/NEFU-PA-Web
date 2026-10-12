@@ -34,18 +34,42 @@ WS_PORT = int(os.environ.get("BOT_WS_PORT", "3002"))
 ACCESS_TOKEN = os.environ.get("ONEBOT_ACCESS_TOKEN", "")
 
 
+# 协议端是否已连接。
+#
+# 这是「机器人是否在工作」的**唯一真相源** —— bot 与 NapCat 之间的 WebSocket
+# 连接状态。网站侧无法自行判断它（两个独立容器），因此由这里上报。
+#
+# 由 asyncio 事件循环写入、由健康检查线程读取。CPython 的 GIL 保证
+# 布尔赋值的原子性，且这里只用于状态展示，无需加锁。
+_connected = False
+
+
 class _HealthHandler(BaseHTTPRequestHandler):
-    """仅用于容器健康检查，不承载业务。"""
+    """健康检查与状态上报，不承载业务。"""
 
     def do_GET(self) -> None:  # noqa: N802
         if self.path == "/healthz":
-            body = b"ok"
-            self.send_response(200)
+            # 未连接时返回 503：让 Docker 把容器标记为 unhealthy。
+            # 之前这里**永远返回 200**，即使 NapCat 早已断开 —— 那个健康检查是假的，
+            # 曾导致机器人停摆近 4 小时而无人察觉。
+            connected = _connected
+            body = b"ok" if connected else b"protocol-down"
+            self.send_response(200 if connected else 503)
             self.send_header("content-type", "text/plain; charset=utf-8")
             self.send_header("content-length", str(len(body)))
             self.end_headers()
             self.wfile.write(body)
             return
+
+        if self.path == "/status":
+            payload = json.dumps({"connected": _connected}).encode()
+            self.send_response(200)
+            self.send_header("content-type", "application/json; charset=utf-8")
+            self.send_header("content-length", str(len(payload)))
+            self.end_headers()
+            self.wfile.write(payload)
+            return
+
         self.send_response(404)
         self.end_headers()
 
@@ -74,11 +98,14 @@ async def _call_api(ws, action: str, params: dict) -> None:
 
 
 async def _handle_connection(ws) -> None:
+    global _connected
+
     if not _authorized(ws):
         log.warning("拒绝未授权的连接")
         await ws.close()
         return
 
+    _connected = True
     log.info("协议端已连接")
 
     async def send(user_id: str, text: str) -> None:
@@ -117,6 +144,10 @@ async def _handle_connection(ws) -> None:
                 log.exception("处理消息出错")
     except websockets.ConnectionClosed:
         log.warning("协议端连接断开")
+    finally:
+        # 任何退出路径（正常断开、异常、被取消）都要把状态置回未连接，
+        # 否则状态会一直停在「已连接」，健康检查又变成假的。
+        _connected = False
 
 
 async def _serve() -> None:
