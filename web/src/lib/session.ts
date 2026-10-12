@@ -6,7 +6,7 @@
  *   - 登录方式两种：学号 + 密码，或 QQ 号 + 密码（D-12）
  */
 
-import { randomBytes } from "node:crypto";
+import { randomUUID } from "node:crypto";
 import { cookies } from "next/headers";
 import { query, queryOne } from "./db";
 
@@ -43,7 +43,11 @@ function toSessionUser(row: UserRow): SessionUser {
 }
 
 export async function createSession(userId: string): Promise<string> {
-  const token = randomBytes(32).toString("base64url");
+  // 会话 id 必须是 uuid：login_sessions.id 的类型就是 uuid。
+  // 之前这里用 base64url 随机串，导致登录在写会话时 500
+  // （invalid input syntax for type uuid）。
+  // 安全性：uuid v4 有 122 位随机性，作为不可猜测的会话标识足够。
+  const token = randomUUID();
   const expiresAt = new Date(Date.now() + SESSION_DAYS * 24 * 60 * 60 * 1000);
 
   await query(

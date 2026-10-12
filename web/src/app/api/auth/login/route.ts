@@ -1,6 +1,6 @@
-import { NextResponse } from "next/server";
 import { login } from "@/modules/account/service";
 import { createSession } from "@/lib/session";
+import { redirectTo } from "@/lib/redirect";
 
 export async function POST(request: Request) {
   const form = await request.formData();
@@ -10,9 +10,9 @@ export async function POST(request: Request) {
   );
 
   if (!result.ok) {
-    return NextResponse.redirect(new URL(`/login?error=${encodeURIComponent(result.error)}`, request.url), 303);
+    return redirectTo(request, `/login?error=${encodeURIComponent(result.error)}`);
   }
 
   await createSession(result.userId);
-  return NextResponse.redirect(new URL("/me", request.url), 303);
+  return redirectTo(request, "/me");
 }
