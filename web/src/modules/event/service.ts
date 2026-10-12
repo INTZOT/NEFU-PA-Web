@@ -476,3 +476,98 @@ async function countOccupiedLocked(
   );
   return Number(res.rows[0]?.occupied ?? 0);
 }
+
+
+// ---------------------------------------------------------------------------
+// 我的报名（个人主页用）
+// ---------------------------------------------------------------------------
+
+export type MyRegistrationStatus = "registered" | "waitlisted" | "attended" | "absent";
+
+export interface MyRegistration {
+  eventId: string;
+  eventTitle: string;
+  startAt: string;
+  location: string | null;
+  format: EventFormat;
+  status: MyRegistrationStatus;
+  /** 候补中的排位（从 1 起）。仅 status 为 waitlisted 时有值。 */
+  waitlistPosition: number | null;
+}
+
+/**
+ * 候补排位。
+ *
+ * 规则与活动页的候选队列一致：**先按缺席次数少的优先，再按报名时间**（D-28）。
+ * 用窗口函数一次算出，避免把排序规则抄成两份（抄两份迟早漂移）。
+ */
+async function waitlistPositionOf(eventId: string, userId: string): Promise<number | null> {
+  const row = await queryOne<{ pos: string }>(
+    `SELECT pos FROM (
+         SELECT r.user_id,
+                row_number() OVER (
+                  ORDER BY (SELECT count(*) FROM event_registrations x
+                             WHERE x.user_id = r.user_id AND x.status = 'absent'),
+                           r.registered_at
+                ) AS pos
+           FROM event_registrations r
+          WHERE r.event_id = $1 AND r.status = 'waitlisted'
+       ) t WHERE t.user_id = $2`,
+    [eventId, userId],
+  );
+  return row ? Number(row.pos) : null;
+}
+
+/**
+ * 我报名的活动（含候补）。
+ *
+ * 「已参加」只能靠签到记录判断。活动**尚未结束**时不能判为缺席 ——
+ * 那时还没到签到的时候，因此未结束的一律显示「已报名」。
+ */
+export async function listMine(userId: string): Promise<MyRegistration[]> {
+  const rows = await query<{
+    event_id: string;
+    title: string;
+    start_at: string;
+    end_at: string | null;
+    location: string | null;
+    format: EventFormat;
+    status: string;
+    checked_in_at: string | null;
+  }>(
+    `SELECT r.event_id, e.title, e.start_at, e.end_at, e.location, e.format,
+            r.status, r.checked_in_at
+       FROM event_registrations r
+       JOIN events e ON e.id = r.event_id
+      WHERE r.user_id = $1 AND r.status <> 'cancelled'
+      ORDER BY e.start_at DESC`,
+    [userId],
+  );
+
+  const now = Date.now();
+
+  return Promise.all(
+    rows.map(async (r) => {
+      let status: MyRegistrationStatus;
+      if (r.status === "waitlisted") {
+        status = "waitlisted";
+      } else if (r.checked_in_at) {
+        status = "attended";
+      } else {
+        const ended = new Date(r.end_at ?? r.start_at).getTime() < now;
+        status = ended ? "absent" : "registered";
+      }
+
+      return {
+        eventId: r.event_id,
+        eventTitle: r.title,
+        startAt: r.start_at,
+        location: r.location,
+        format: r.format,
+        status,
+        waitlistPosition:
+          status === "waitlisted" ? await waitlistPositionOf(r.event_id, userId) : null,
+      };
+    }),
+  );
+}

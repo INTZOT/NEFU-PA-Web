@@ -30,7 +30,8 @@ export type AuditAction =
   | "photo.upload"
   | "photo.update"
   | "photo.delete"
-  | "site.update";
+  | "site.update"
+  | "profile.update";
 
 export interface AuditEntry {
   id: string;
@@ -109,4 +110,5 @@ export const ACTION_LABEL: Record<AuditAction, string> = {
   "photo.update": "修改照片说明",
   "photo.delete": "删除照片",
   "site.update": "修改首页文案",
+  "profile.update": "修改个人简介",
 };
