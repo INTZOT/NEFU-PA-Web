@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/session";
-import { canEnterAdmin } from "@/lib/roles";
+import { canEnterAdmin, isSuperAdmin } from "@/lib/roles";
 
 export default async function AdminPage() {
   const user = await getCurrentUser();
@@ -27,6 +27,18 @@ export default async function AdminPage() {
             发布与维护公告，首页与公告页展示
           </p>
         </Link>
+
+        {isSuperAdmin(user) ? (
+          <Link
+            href="/admin/members"
+            className="rounded-lg border border-neutral-200 bg-white p-4 transition hover:border-neutral-900"
+          >
+            <h2 className="font-semibold">成员与权限</h2>
+            <p className="mt-1 text-sm text-neutral-500">
+              设置或取消管理员（仅超级管理员可见）
+            </p>
+          </Link>
+        ) : null}
 
         <div className="rounded-lg border border-dashed border-neutral-200 p-4">
           <h2 className="font-semibold text-neutral-400">赛事与活动</h2>
