@@ -107,6 +107,18 @@ services:
     environment:
       NAPCAT_UID: ${NAPCAT_UID:-1000}
       NAPCAT_GID: ${NAPCAT_GID:-1000}
+      # ⚠️ 这一项决定了「重启后要不要重新扫码」，非常关键。
+      #
+      # entrypoint.sh 的逻辑是：
+      #   if [ -n "${ACCOUNT}" ]; then  qq --no-sandbox -q $ACCOUNT   # 快速登录
+      #   else                          qq --no-sandbox              # 二维码登录
+      #
+      # 不设 ACCOUNT 时**一律走二维码登录** —— 即使快速登录凭据就在 napcat_qq 卷里。
+      # 这正是「每次重建容器都要重新扫码」的原因（曾误判为登录态不能持久化）。
+      #
+      # 设为机器人 QQ 号即可在重启后自动快速登录，无需人工扫码。
+      # 若该凭据失效（例如被服务端踢下线），QQ 仍会退化为二维码登录。
+      ACCOUNT: ${BOT_QQ:-}
     ports:
       # 仅绑定本机回环，不对外暴露
       - "127.0.0.1:3001:3001"
@@ -114,6 +126,8 @@ services:
     volumes:
       - napcat_config:/app/napcat/config
       - napcat_qq:/app/.config/QQ
+      # 二维码文件：web 侧需要只读访问，以便在超管面板里展示（掉线时用）
+      - napcat_cache:/app/napcat/cache
     # 把日志同时写到宿主机文件，供二维码服务读取（首次登录扫码用）
     logging:
       driver: json-file
@@ -124,6 +138,7 @@ services:
 volumes:
   db_data:
   uploads_data: # 社团照片（D-31）
+  napcat_cache: # NapCat 的二维码文件，供 web 只读读取
   caddy_data:
   caddy_config:
   napcat_config:
