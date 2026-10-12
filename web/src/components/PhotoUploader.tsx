@@ -18,23 +18,56 @@ import { useRef, useState } from "react";
 const MAX_EDGE = 1920;
 const QUALITY = 0.85;
 
+/**
+ * 把 File 解码成可绘制到 canvas 的图源。
+ *
+ * 优先用 createImageBitmap（快、不占 DOM），但它并非所有浏览器都支持
+ * （例如较旧的 Safari），因此回退到 <img> + objectURL。
+ */
+async function decode(
+  file: File,
+): Promise<{ source: CanvasImageSource; width: number; height: number }> {
+  if (typeof createImageBitmap === "function") {
+    try {
+      const bitmap = await createImageBitmap(file);
+      return { source: bitmap, width: bitmap.width, height: bitmap.height };
+    } catch {
+      /* 落到下面的回退方案 */
+    }
+  }
+
+  const url = URL.createObjectURL(file);
+  try {
+    const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+      const el = new Image();
+      el.onload = () => resolve(el);
+      el.onerror = () => reject(new Error("图片解码失败"));
+      el.src = url;
+    });
+    return { source: img, width: img.naturalWidth, height: img.naturalHeight };
+  } finally {
+    // 解码完成后即可释放（绘制已在下方同步完成前不会发生，故延后到调用处）
+    setTimeout(() => URL.revokeObjectURL(url), 10_000);
+  }
+}
+
 async function compress(file: File): Promise<File> {
-  // 非图片或本来就是小图，直接返回
+  // 非图片直接返回
   if (!file.type.startsWith("image/")) return file;
 
-  const bitmap = await createImageBitmap(file);
-  const scale = Math.min(1, MAX_EDGE / Math.max(bitmap.width, bitmap.height));
+  const { source, width, height } = await decode(file);
+  const scale = Math.min(1, MAX_EDGE / Math.max(width, height));
 
   // 本来就不大：不重新编码，避免无谓的画质损失
   if (scale === 1 && file.size <= 1.5 * 1024 * 1024) return file;
 
   const canvas = document.createElement("canvas");
-  canvas.width = Math.round(bitmap.width * scale);
-  canvas.height = Math.round(bitmap.height * scale);
+  canvas.width = Math.round(width * scale);
+  canvas.height = Math.round(height * scale);
 
   const ctx = canvas.getContext("2d");
   if (!ctx) return file;
-  ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+  ctx.drawImage(source, 0, 0, canvas.width, canvas.height);
 
   const blob = await new Promise<Blob | null>((resolve) =>
     canvas.toBlob(resolve, "image/jpeg", QUALITY),
@@ -62,6 +95,13 @@ export function PhotoUploader({ action }: { action: string }) {
 
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
+
+    // ⚠️ 必须在任何 await **之前**把要用的事件信息取出来。
+    //    React 的事件对象在异步边界之后会失效，e.currentTarget 会变成 null，
+    //    报错形如「FormData constructor: Argument 1 is not an object」。
+    const form = e.currentTarget;
+    const action = form.action;
+
     const input = inputRef.current;
     if (!input?.files?.[0]) return;
 
@@ -71,28 +111,20 @@ export function PhotoUploader({ action }: { action: string }) {
 
     try {
       const compressed = await compress(original);
-      setNote(
-        `已压缩为 ${formatSize(compressed.size)}，正在上传…`,
-      );
+      setNote(`已压缩为 ${formatSize(compressed.size)}，正在上传…`);
 
-      // 用 fetch 提交压缩后的文件，再手动跟随服务端返回的重定向。
-      // 这样既能替换文件内容，又保留「POST → 303 → 跳转」的既有语义
+      // 用 fetch 提交压缩后的文件，再手动跟随服务端返回的重定向：
+      // 既能替换文件内容，又保留「POST → 303 → 跳转」的既有语义
       // （服务端逻辑不用为客户端压缩做任何改动）。
-      const form = e.currentTarget;
       const data = new FormData(form);
       data.set("file", compressed, compressed.name);
 
-      const res = await fetch(form.action, {
-        method: "POST",
-        body: data,
-        redirect: "manual",
-      });
+      const res = await fetch(action, { method: "POST", body: data, redirect: "manual" });
       const location = res.headers.get("location");
-      window.location.href = location ?? form.action.replace("/api/admin/photos", "/admin/photos");
+      window.location.href = location ?? action.replace("/api/admin/photos", "/admin/photos");
     } catch (err) {
       setBusy(false);
-      setNote(err instanceof Error ? `压缩失败：${err.message}` : "压缩失败");
-      input.setAttribute("name", "file");
+      setNote(err instanceof Error ? `处理失败：${err.message}` : "处理失败");
     }
   }
 
