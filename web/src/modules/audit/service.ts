@@ -23,7 +23,10 @@ export type AuditAction =
   | "rating.settle"
   | "rating.revoke"
   | "season.create"
-  | "season.update";
+  | "season.update"
+  | "credential.self"
+  | "credential.admin"
+  | "password.admin";
 
 export interface AuditEntry {
   id: string;
@@ -95,4 +98,7 @@ export const ACTION_LABEL: Record<AuditAction, string> = {
   "rating.revoke": "撤销比赛结算",
   "season.create": "开启新赛季",
   "season.update": "修改赛季日期",
+  "credential.self": "自助换绑凭据",
+  "credential.admin": "管理员代改凭据",
+  "password.admin": "管理员代设密码",
 };

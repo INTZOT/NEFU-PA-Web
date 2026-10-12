@@ -168,6 +168,46 @@ export default async function MePage({
         </p>
       </section>
 
+      <section id="credentials" className="rounded-lg border border-neutral-200 bg-white p-4">
+        <h2 className="font-semibold">账号凭据</h2>
+        <p className="mt-1 text-sm text-neutral-600">
+          登录用的 QQ 号与学号可以自行修改，无需管理员审批（D-11）。
+          改完立即生效，下次登录请用新的。
+        </p>
+
+        <form action="/api/me/credentials" method="post" className="mt-3 space-y-3">
+          <div className="grid gap-3 sm:grid-cols-2">
+            <label className="text-sm">
+              <span className="text-neutral-500">QQ 号</span>
+              <input
+                name="qqNumber"
+                defaultValue={user.qqNumber}
+                required
+                pattern="\\d{5,12}"
+                className="mt-1 w-full rounded border border-neutral-300 px-3 py-2"
+              />
+            </label>
+            <label className="text-sm">
+              <span className="text-neutral-500">学号</span>
+              <input
+                name="studentId"
+                defaultValue={user.studentId}
+                required
+                pattern="\\d{10}"
+                className="mt-1 w-full rounded border border-neutral-300 px-3 py-2"
+              />
+            </label>
+          </div>
+          <button type="submit" className="rounded bg-neutral-900 px-4 py-2 text-sm text-white">
+            保存凭据
+          </button>
+          <p className="text-xs text-neutral-500">
+            ⚠️ 换绑后，<strong>用旧 QQ 号将无法再登录</strong>。
+            积分、约球等历史数据跟随账号，不受影响。
+          </p>
+        </form>
+      </section>
+
       <form action="/api/auth/logout" method="post">
         <button type="submit" className="text-sm text-neutral-500 hover:text-neutral-900">
           退出登录

@@ -96,6 +96,75 @@ export default async function MembersAdminPage({
                   {isSuper ? "超管账号不可修改" : "不能修改自己"}
                 </span>
               )}
+
+              {canAct ? (
+                <details className="w-full">
+                  <summary className="cursor-pointer text-xs text-neutral-500 hover:text-neutral-900">
+                    人工兜底（改密码 / 换绑）
+                  </summary>
+                  <div className="mt-3 grid gap-4 border-t border-neutral-100 pt-3 sm:grid-cols-2">
+                    <form
+                      action={`/api/admin/members/${m.id}/password`}
+                      method="post"
+                      className="space-y-2"
+                    >
+                      <p className="text-xs font-medium text-neutral-700">代设临时密码</p>
+                      <p className="text-xs text-neutral-500">
+                        用于「重置时输错新密码导致锁死」（D-16）。
+                      </p>
+                      <input
+                        name="password"
+                        required
+                        minLength={6}
+                        placeholder="临时密码（至少 6 位）"
+                        className="w-full rounded border border-neutral-300 px-3 py-1.5 text-sm"
+                      />
+                      <button
+                        type="submit"
+                        className="rounded border border-neutral-300 px-3 py-1.5 text-xs"
+                      >
+                        设置密码
+                      </button>
+                    </form>
+
+                    <form
+                      action={`/api/admin/members/${m.id}/credentials`}
+                      method="post"
+                      className="space-y-2"
+                    >
+                      <p className="text-xs font-medium text-neutral-700">代改凭据</p>
+                      <p className="text-xs text-neutral-500">
+                        用于「QQ 号被盗/停用」这类死局（D-16）。
+                      </p>
+                      <input
+                        name="qqNumber"
+                        defaultValue={m.qqNumber}
+                        required
+                        pattern="[0-9]{5,12}"
+                        placeholder="QQ 号"
+                        className="w-full rounded border border-neutral-300 px-3 py-1.5 text-sm"
+                      />
+                      <input
+                        name="studentId"
+                        defaultValue={m.studentId}
+                        required
+                        pattern="[0-9]{10}"
+                        placeholder="学号"
+                        className="w-full rounded border border-neutral-300 px-3 py-1.5 text-sm"
+                      />
+                      <button
+                        type="submit"
+                        className="rounded border border-neutral-300 px-3 py-1.5 text-xs"
+                      >
+                        保存凭据
+                      </button>
+                    </form>
+                  </div>
+                  <p className="mt-2 text-xs text-amber-700">
+                    ⚠️ 这两项都是对他人账号的直接改动，会记入操作记录。
+                  </p>
+                </details>
+              ) : null}
             </li>
           );
         })}
