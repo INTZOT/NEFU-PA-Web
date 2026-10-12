@@ -4,21 +4,28 @@
 {$SITE_DOMAIN} {
 	encode zstd gzip
 
-	# ---- 二维码页（临时）----
-	# 用途：NapCat 首次登录需扫码，而登录码有效期很短。
-	# 由**宿主机**上的 scripts/qr_server.py 提供实时二维码（容器里没有可用的 python 镜像）。
-	# 启动：cd ~/nefu-pa-web && nohup python3 scripts/qr_server.py 8099 &
-	# 登录完成后可删除本段并停掉该脚本。
-	handle /qr* {
-		reverse_proxy host.docker.internal:8099
-	}
-
-	handle {
-		reverse_proxy web:3000
-	}
+	reverse_proxy web:3000
 
 	log {
 		output stdout
 		format console
 	}
 }
+
+# ---------------------------------------------------------------
+# 关于二维码页（/qr）：
+#   NapCat 首次登录需要扫码，而登录码有效期很短，因此曾有单独的路由，
+#   由宿主机上的 scripts/qr_server.py 提供实时二维码。
+#   登录成功后该路由**已移除** —— 它暴露的内容等同于登录凭据。
+#
+#   再次需要时（换 QQ 号、掉线重扫）：
+#     1. 部署机上运行：cd ~/nefu-pa-web && nohup python3 scripts/qr_server.py 8099 &
+#     2. 在本文件内加回下面这段（并把上面的 reverse_proxy 包进 handle 块）：
+#          handle /qr* {
+#              reverse_proxy host.docker.internal:8099
+#          }
+#          handle {
+#              reverse_proxy web:3000
+#          }
+#     3. docker compose restart caddy；用完记得再删掉
+# ---------------------------------------------------------------
