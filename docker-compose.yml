@@ -93,8 +93,8 @@ services:
   #       因其涉及交互式登录，默认不随 compose 一起启动；
   #       首次部署请单独运行，详见 README「QQ 协议端」一节。
   napcat:
-    # 通过镜像代理拉取（daocloud 对非 library 镜像频繁 502）
-    image: docker.1ms.run/mlikiowa/napcat-docker:latest
+    # 本机无法直连 Docker Hub；此镜像由具备网络条件的机器 docker save 后传入（见 README）
+    image: mlikiowa/napcat-docker:latest
     restart: unless-stopped
     profiles: [napcat]
     environment:
