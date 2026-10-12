@@ -3,7 +3,7 @@ import { listSections, hasContent } from "@/modules/club/service";
 import { listFeatured } from "@/modules/photo/service";
 
 export const metadata = {
-  title: "社团介绍 · 东北林业大学匹克球社团",
+  title: "社团介绍",
 };
 
 export default async function ClubPage() {

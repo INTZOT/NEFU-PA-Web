@@ -1,7 +1,7 @@
 import { listAll } from "@/modules/photo/service";
 import { EmptyState, PageHeader } from "@/components/ui";
 
-export const metadata = { title: "社团相册 · 东北林业大学匹克球协会" };
+export const metadata = { title: "社团相册" };
 
 export default async function GalleryPage() {
   const photos = await listAll();

@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { listPublished, isRegistrationOpen } from "@/modules/event/service";
 
-export const metadata = { title: "活动 · 东北林业大学匹克球社团" };
+export const metadata = { title: "社团活动" };
 
 function formatTime(value: string): string {
   return new Date(value).toLocaleString("zh-CN", {

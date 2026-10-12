@@ -4,7 +4,7 @@ import { getCurrentUser } from "@/lib/session";
 import { listSeasons, getActiveSeason, getLeaderboard, PAGE_SIZE } from "@/modules/rating/leaderboard";
 import { archiveDue } from "@/modules/rating/season";
 
-export const metadata = { title: "积分排行 · 东北林业大学匹克球社团" };
+export const metadata = { title: "积分排行" };
 
 export default async function LeaderboardPage({
   searchParams,

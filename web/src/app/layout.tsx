@@ -9,7 +9,13 @@ import "./globals.css";
 // 直接依赖系统字体栈（在 globals.css 里定义），避免构建期的网络依赖。
 
 export const metadata: Metadata = {
-  title: "东北林业大学匹克球协会",
+  // 图标不在这里声明：Next.js 的 App Router 会自动识别 app/favicon.ico、app/icon.png、
+  // app/apple-icon.png 并注入对应的 <link>。约定优于配置，也避免两处声明不一致。
+  title: {
+    default: "东北林业大学匹克球协会",
+    // 子页面若自己导出 title，会以「页面名 · 协会名」的形式拼接
+    template: "%s · 东北林业大学匹克球协会",
+  },
   description: "东北林业大学匹克球协会官方网站",
 };
 

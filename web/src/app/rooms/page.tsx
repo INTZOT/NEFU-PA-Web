@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/session";
 import { listActive } from "@/modules/room/service";
 
-export const metadata = { title: "约球大厅 · 东北林业大学匹克球社团" };
+export const metadata = { title: "约球大厅" };
 
 function remaining(expiresAt: string): string {
   const ms = new Date(expiresAt).getTime() - Date.now();
