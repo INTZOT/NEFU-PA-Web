@@ -12,9 +12,8 @@ from __future__ import annotations
 
 import asyncio
 import logging
-import os
 
-from . import db, shared_rules
+from . import db, messages, shared_rules
 
 log = logging.getLogger("bot.handlers")
 
@@ -23,26 +22,13 @@ RESET_COMMAND = "重置密码"
 MIN_PASSWORD = 6
 
 
-def _site_url() -> str:
-    return os.environ.get("SITE_URL", "").rstrip("/")
-
-
 def _register_hint(code: str) -> str:
-    """注册引导文案。邀请码属凭据级信息，故强调不要转发。"""
-    lines = [
-        "你的邀请码：",
-        code,
-        "",
-    ]
-    url = _site_url()
-    if url:
-        lines.append(f"注册地址：{url}/register")
-        lines.append("")
-    lines.append("注册时填：姓名、学号、密码、邀请码。")
-    lines.append("QQ 号会自动带入，不需要你填。")
-    lines.append("")
-    lines.append("⚠️ 不要把邀请码转发给别人 —— 它等同于你的注册凭证。")
-    return "\n".join(lines)
+    """注册引导文案（模板可自定义，见 messages 模块）。
+
+    邀请码属凭据级信息，因此默认文案里强调了不要转发；
+    但文案本身由管理员在后台维护，这里只负责填 {code}。
+    """
+    return messages.message("bot.register.reply", code=code)
 
 
 async def _reply(send, user_id: str, text: str) -> None:
@@ -77,17 +63,13 @@ async def handle_message(send, user_id: str, text: str) -> None:
         return
 
     # ---- 其他：给出可用指令 ----
-    await _reply(
-        send,
-        user_id,
-        "可用指令：\n· 注册\n· 重置密码",
-    )
+    await _reply(send, user_id, messages.message("bot.unknown"))
 
 
 async def _handle_register(send, user_id: str, user: dict | None) -> None:
     # 已注册 → 拒绝（D-13：一个 QQ 号只能注册一次）
     if user is not None:
-        await _reply(send, user_id, "你已经注册过了，无需重复注册。\n如需重置密码，发送：重置密码")
+        await _reply(send, user_id, messages.message("bot.register.already"))
         return
 
     existing = await asyncio.to_thread(db.find_invite_by_qq, user_id)
@@ -102,7 +84,7 @@ async def _handle_register(send, user_id: str, user: dict | None) -> None:
         await asyncio.to_thread(db.create_invite, user_id, code)
     except Exception:
         log.exception("生成邀请码失败")
-        await _reply(send, user_id, "生成邀请码失败，请稍后再试或联系管理员。")
+        await _reply(send, user_id, messages.message("bot.register.failed"))
         return
 
     await _reply(send, user_id, _register_hint(code))
@@ -110,7 +92,7 @@ async def _handle_register(send, user_id: str, user: dict | None) -> None:
 
 async def _handle_reset_start(send, user_id: str, user: dict | None) -> None:
     if user is None:
-        await _reply(send, user_id, "你还没有注册。发送「注册」获取邀请码。")
+        await _reply(send, user_id, messages.message("bot.reset.notRegistered"))
         return
 
     pending = await asyncio.to_thread(db.get_pending_reset, user["id"])
@@ -120,14 +102,15 @@ async def _handle_reset_start(send, user_id: str, user: dict | None) -> None:
     await _reply(
         send,
         user_id,
-        "请输入新密码（至少 6 位）。\n"
-        "提醒：新密码会经过 QQ 聊天记录，请勿使用你在其他网站用过的密码。",
+        messages.message("bot.reset.prompt", minPassword=MIN_PASSWORD),
     )
 
 
 async def _apply_new_password(send, user_id: str, user: dict, pending: dict, plain: str) -> None:
     if len(plain) < MIN_PASSWORD:
-        await _reply(send, user_id, f"密码至少 {MIN_PASSWORD} 位，请重新输入。")
+        await _reply(
+            send, user_id, messages.message("bot.reset.tooShort", minPassword=MIN_PASSWORD)
+        )
         return
 
     try:
@@ -137,7 +120,7 @@ async def _apply_new_password(send, user_id: str, user: dict, pending: dict, pla
         await asyncio.to_thread(shared_rules.invalidate_sessions, user_id)
     except Exception:
         log.exception("重置密码失败")
-        await _reply(send, user_id, "重置失败，请稍后再试或联系管理员。")
+        await _reply(send, user_id, messages.message("bot.reset.failed"))
         return
 
-    await _reply(send, user_id, "密码已重置，其他设备上的登录已失效，可以用新密码登录了。")
+    await _reply(send, user_id, messages.message("bot.reset.done"))

@@ -45,14 +45,26 @@ export interface SettingValue {
  * **取不到时返回 fallback 而不是空串**：配置表尚为空（或管理员清空过）时，
  * 页面仍应显示原本的文案，不能变成空白。
  */
-export async function getValue(key: SettingKey): Promise<string> {
+/**
+ * 读一项配置。
+ *
+ * **取不到时返回 fallback 而不是空串**：配置表尚为空（或管理员清空过）时，
+ * 页面仍应显示原本的文案，不能变成空白。
+ *
+ * `explicitFallback` 供**不在 SETTING_DEFS 里**的键使用
+ * （如机器人文案，其定义在 modules/bot/messages.ts）。
+ */
+export async function getValue(
+  key: string,
+  explicitFallback?: string,
+): Promise<string> {
   const def = SETTING_DEFS.find((d) => d.key === key);
   const row = await queryOne<{ value: string }>(
     "SELECT value FROM site_settings WHERE key = $1",
     [key],
   );
   const value = row?.value?.trim();
-  return value ? value : (def?.fallback ?? "");
+  return value ? value : (def?.fallback ?? explicitFallback ?? "");
 }
 
 /** 管理页用：取出全部配置（含尚未写入库的项）。 */

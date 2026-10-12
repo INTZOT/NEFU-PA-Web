@@ -79,6 +79,16 @@ export default async function AdminPage() {
         ) : null}
 
         <Link
+          href="/admin/bot-messages"
+          className="rounded-lg border border-line bg-surface p-4 transition hover:border-brand"
+        >
+          <h2 className="font-semibold">机器人文案</h2>
+          <p className="mt-1 text-sm text-ink-muted">
+            自定义机器人私聊回复的内容（注册、重置密码）
+          </p>
+        </Link>
+
+        <Link
           href="/admin/home"
           className="rounded-lg border border-line bg-surface p-4 transition hover:border-brand"
         >

@@ -16,6 +16,8 @@ import { hashPassword } from "@/lib/password";
 import { generateInviteCode, isValidInviteCode, normalizeInviteCode } from "@/lib/invite-code";
 import { invalidateAllSessions } from "@/lib/session";
 import { queryOne } from "@/lib/db";
+import { BOT_MESSAGES } from "@/modules/bot/messages";
+import { getValue } from "@/modules/setting/service";
 
 function authorized(request: Request): boolean {
   const expected = process.env.SHARED_RULES_TOKEN;
@@ -80,6 +82,26 @@ export async function POST(request: Request) {
       if (!row) return NextResponse.json({ error: "user not found" }, { status: 404 });
       const killed = await invalidateAllSessions(row.id);
       return NextResponse.json({ killed });
+    }
+
+    /**
+     * 取机器人回复文案（模板）。
+     *
+     * 为什么由网站提供：文案的定义与默认值在 web 侧（`modules/bot/messages.ts`），
+     * 管理员在后台改的就是它。机器人只取用、不自己存一份 ——
+     * 否则两边会漂移（与密码加密同理：规则只实现一份）。
+     *
+     * 返回的是**模板**（含 {code} 这类占位符），由机器人填值 ——
+     * 因为只有它知道 SITE_URL 等运行期信息。
+     */
+    case "get-bot-messages": {
+      const templates = await Promise.all(
+        BOT_MESSAGES.map(async (def) => ({
+          key: def.key,
+          template: await getValue(def.key, def.fallback),
+        })),
+      );
+      return NextResponse.json({ messages: templates });
     }
 
     default:
