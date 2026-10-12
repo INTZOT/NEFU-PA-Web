@@ -1,6 +1,9 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/session";
 import { queryOne } from "@/lib/db";
+import { listPendingForUser } from "@/modules/event/pairing";
+import { Notice } from "@/components/Notice";
 
 // 五档话术：仅作为选择自评分时的参考，不跟随展示（D-21）
 const TIERS = [
@@ -24,12 +27,15 @@ function tierOf(value: number): string {
 export default async function MePage({
   searchParams,
 }: {
-  searchParams: Promise<{ welcome?: string; error?: string; saved?: string }>;
+  searchParams: Promise<{ welcome?: string; error?: string; saved?: string; ok?: string }>;
 }) {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
 
-  const { welcome, error, saved } = await searchParams;
+  const { welcome, error, saved, ok } = await searchParams;
+
+  // 待我表态的双打搭档邀请（D-20 的双向确认）
+  const invites = await listPendingForUser(user.id);
 
   // 本赛季的比赛积分（D-22：与自评分是两个独立的量）
   const season = await queryOne<{ name: string; rating: number; wins: number; losses: number }>(
@@ -53,10 +59,42 @@ export default async function MePage({
           自评分已更新。
         </p>
       ) : null}
-      {error ? (
-        <p className="rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
-          {error}
-        </p>
+      <Notice ok={ok} error={error} />
+
+      {invites.length > 0 ? (
+        <section className="space-y-3 rounded-lg border border-amber-200 bg-amber-50 p-4">
+          <h2 className="font-semibold text-amber-900">待你确认的双打搭档</h2>
+          {invites.map((inv) => (
+            <div key={inv.pairingId} className="space-y-2 text-sm">
+              <p className="text-amber-900">
+                <Link href={`/events/${inv.eventId}`} className="font-medium hover:underline">
+                  {inv.eventTitle}
+                </Link>
+                <span className="ml-2">
+                  {inv.proposedBy === "admin" ? "管理员指派" : ""} 搭档：{inv.partnerName}
+                </span>
+              </p>
+              <div className="flex items-center gap-3">
+                <form action={`/api/pairings/${inv.pairingId}/accept`} method="post">
+                  <button
+                    type="submit"
+                    className="rounded bg-neutral-900 px-3 py-1.5 text-sm text-white"
+                  >
+                    同意
+                  </button>
+                </form>
+                <form action={`/api/pairings/${inv.pairingId}/reject`} method="post">
+                  <button
+                    type="submit"
+                    className="text-sm text-neutral-500 hover:text-neutral-900"
+                  >
+                    拒绝
+                  </button>
+                </form>
+              </div>
+            </div>
+          ))}
+        </section>
       ) : null}
 
       <section className="rounded-lg border border-neutral-200 bg-white p-4">

@@ -267,6 +267,21 @@ export async function createEvent(input: EventInput, createdBy: string): Promise
 
 export const CANCEL_HOURS_BEFORE = 24;
 
+/**
+ * 候补优先级排序（D-28 第三条）。
+ *
+ * 先按**缺席次数**升序（没缺席过的排前面），再按报名时间 —— 即：
+ * 名额紧张时，常缺席的人让位给更可能到场的人。
+ * 这是项目里唯一的成员信誉机制：积分不惩罚爽约（D-04）。
+ *
+ * 注意 ORDER BY 里的子查询引用了外层表的别名，因此各调用处的表别名必须叫这个。
+ */
+const WAITLIST_ORDER_SQL = `
+  ORDER BY
+    (SELECT count(*) FROM event_registrations a
+      WHERE a.user_id = w.user_id AND a.status = 'absent'),
+    w.registered_at`;
+
 export function nowMs(): number {
   return Date.now();
 }
@@ -414,9 +429,9 @@ export async function cancel(userId: string, eventId: string): Promise<CancelRes
 
     // 自动递补：按报名时间取最早的候补
     const waitlisted = await client.query<{ user_id: string }>(
-      `SELECT user_id FROM event_registrations
-        WHERE event_id = $1 AND status = 'waitlisted'
-        ORDER BY registered_at
+      `SELECT w.user_id FROM event_registrations w
+        WHERE w.event_id = $1 AND w.status = 'waitlisted'
+        ${WAITLIST_ORDER_SQL}
         LIMIT 1`,
       [eventId],
     );

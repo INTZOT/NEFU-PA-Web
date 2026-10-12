@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getCurrentUser } from "@/lib/session";
 import { getById, isRegistrationOpen, canCancel, CANCEL_HOURS_BEFORE } from "@/modules/event/service";
+import { getPartner } from "@/modules/event/pairing";
 import { queryOne } from "@/lib/db";
 import { Notice } from "@/components/Notice";
 
@@ -42,6 +43,10 @@ export default async function EventDetailPage({
   const open = isRegistrationOpen(event);
   const cancellable = canCancel(event);
   const myStatus = mine?.status ?? null;
+
+  // 双打：我已确认的搭档（D-20 双向确认）
+  const partner =
+    user && event.format === "doubles" ? await getPartner(id, user.id) : null;
 
   return (
     <div className="space-y-5">
@@ -101,6 +106,40 @@ export default async function EventDetailPage({
         ) : myStatus === "registered" ? (
           <div className="space-y-2">
             <p className="text-sm text-green-700">你已经报名成功。</p>
+
+            {event.format === "doubles" ? (
+              partner ? (
+                <p className="text-sm text-neutral-700">
+                  搭档：<span className="font-medium">{partner.partnerName}</span>
+                  <span className="ml-2 text-xs text-neutral-500">（已确认，你俩合占一个名额）</span>
+                </p>
+              ) : (
+                <div className="rounded border border-neutral-200 bg-neutral-50 p-3">
+                  <p className="text-sm text-neutral-700">还没有搭档。</p>
+                  <form
+                    action={`/api/events/${event.id}/partner`}
+                    method="post"
+                    className="mt-2 flex flex-wrap items-center gap-2"
+                  >
+                    <input
+                      name="partnerIdent"
+                      required
+                      placeholder="搭档的 QQ 号或学号"
+                      className="rounded border border-neutral-300 px-3 py-1.5 text-sm outline-none focus:border-neutral-900"
+                    />
+                    <button
+                      type="submit"
+                      className="rounded bg-neutral-900 px-3 py-1.5 text-sm text-white"
+                    >
+                      邀请搭档
+                    </button>
+                  </form>
+                  <p className="mt-1 text-xs text-neutral-500">
+                    对方也需要先报名这个赛事，邀请发出后由对方在个人主页确认。
+                  </p>
+                </div>
+              )
+            ) : null}
             {cancellable ? (
               <form action={`/api/events/${event.id}/cancel`} method="post">
                 <button type="submit" className="text-sm text-red-600 hover:text-red-800">
