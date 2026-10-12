@@ -18,6 +18,9 @@ import { readFile, stat } from "node:fs/promises";
 
 const BOT_HEALTH_URL = process.env.BOT_HEALTH_URL ?? "http://bot:8000";
 const QR_PATH = process.env.NAPCAT_QR_PATH ?? "/app/napcat-cache/qrcode.png";
+// 宿主机看门狗写的状态文件（只读挂载）。读不到就当作没有装看门狗。
+const WATCHDOG_STATE_PATH =
+  process.env.WATCHDOG_STATE_PATH ?? "/app/watchdog-state/napcat-watchdog.json";
 
 /** 超过这个时长没更新的二维码视为过期（NapCat 约每 2 分钟写一次）。 */
 const QR_FRESH_MS = 5 * 60 * 1000;
@@ -33,6 +36,10 @@ export interface BotStatus {
   qrFresh: boolean;
   /** 二维码图片字节。仅在需要展示时返回。 */
   qr: Buffer | null;
+  /** 看门狗最近一次自动恢复尝试的时间戳（毫秒）。没尝试过为 null。 */
+  recoveryAttemptedAt: number | null;
+  /** 最近一次自动恢复的结果描述。 */
+  recoveryResult: string | null;
 }
 
 async function fetchConnected(): Promise<{ reachable: boolean; connected: boolean }> {
@@ -62,8 +69,32 @@ async function readQr(): Promise<{ hasQr: boolean; qrFresh: boolean; qr: Buffer 
   }
 }
 
+/**
+ * 读取看门狗状态。
+ *
+ * 读不到（未安装看门狗、或文件尚未生成）时返回空值 ——
+ * 面板会因此不显示自动恢复的提示，而不是报错。
+ */
+async function readWatchdog(): Promise<{ attemptedAt: number | null; result: string | null }> {
+  try {
+    const raw = await readFile(WATCHDOG_STATE_PATH, "utf8");
+    const data = JSON.parse(raw) as { lastAttemptAt?: number; lastAttemptResult?: string };
+    return {
+      // 脚本写的是秒，这里转成毫秒以便直接给 Date 用
+      attemptedAt: typeof data.lastAttemptAt === "number" ? data.lastAttemptAt * 1000 : null,
+      result: typeof data.lastAttemptResult === "string" ? data.lastAttemptResult : null,
+    };
+  } catch {
+    return { attemptedAt: null, result: null };
+  }
+}
+
 export async function getBotStatus(): Promise<BotStatus> {
-  const [health, qr] = await Promise.all([fetchConnected(), readQr()]);
+  const [health, qr, watchdog] = await Promise.all([
+    fetchConnected(),
+    readQr(),
+    readWatchdog(),
+  ]);
 
   return {
     connected: health.connected,
@@ -71,7 +102,8 @@ export async function getBotStatus(): Promise<BotStatus> {
     hasQr: qr.hasQr,
     qrFresh: qr.qrFresh,
     // 已连接时不需要二维码 —— 不把它读进内存、也不返回给页面
-
     qr: health.connected ? null : qr.qr,
+    recoveryAttemptedAt: watchdog.attemptedAt,
+    recoveryResult: watchdog.result,
   };
 }

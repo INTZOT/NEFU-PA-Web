@@ -1,0 +1,26 @@
+# NapCat 登录看门狗 —— 单元定义
+#
+# 安装（需要 sudo）：
+#   sudo cp deploy/napcat-watchdog.service deploy/napcat-watchdog.timer /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now napcat-watchdog.timer
+#
+# 查看状态：
+#   systemctl list-timers napcat-watchdog.timer
+#   journalctl -u napcat-watchdog.service -n 30 --no-pager
+
+[Unit]
+Description=NapCat 登录看门狗（被踢下线后自动恢复）
+Documentation=file:///home/intzot/nefu-pa-web/scripts/napcat_watchdog.py
+
+[Service]
+Type=oneshot
+User=intzot
+Group=intzot
+WorkingDirectory=/home/intzot/nefu-pa-web
+ExecStart=/usr/bin/python3 /home/intzot/nefu-pa-web/scripts/napcat_watchdog.py
+
+# docker 需要访问 /var/run/docker.sock（intzot 已在 docker 组）
+SupplementaryGroups=docker
+
+# 失败不重启：脚本自身已做冷却控制，反复拉起只会掩盖问题

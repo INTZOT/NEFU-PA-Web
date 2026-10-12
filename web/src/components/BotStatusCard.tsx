@@ -27,9 +27,17 @@ export async function BotStatusCard() {
       </div>
 
       {status.connected ? (
-        <p className="text-sm text-ink-muted">
-          机器人已与 QQ 协议端连接，注册、重置密码等功能正常。
-        </p>
+        <div className="space-y-1">
+          <p className="text-sm text-ink-muted">
+            机器人已与 QQ 协议端连接，注册、重置密码等功能正常。
+          </p>
+          {status.recoveryAttemptedAt ? (
+            <p className="text-xs text-ink-subtle">
+              最近一次掉线由看门狗自动重启恢复（
+              {new Date(status.recoveryAttemptedAt).toLocaleString("zh-CN")}）。
+            </p>
+          ) : null}
+        </div>
       ) : !status.reachable ? (
         <p className="text-sm text-ink">
           连不上机器人服务本身。请先在服务器上检查 bot 容器：
@@ -44,6 +52,17 @@ export async function BotStatusCard() {
             用手机 QQ（机器人账号）扫描下面的二维码即可恢复，无需登录服务器。
           </p>
           <BotQrPanel />
+          {status.recoveryAttemptedAt ? (
+            <p className="text-xs text-warn">
+              ⚠️ 看门狗已于{" "}
+              {new Date(status.recoveryAttemptedAt).toLocaleString("zh-CN")}
+              {" "}尝试自动重启，但仍未恢复 —— 说明登录态已真正失效，需要人工扫码。
+            </p>
+          ) : (
+            <p className="text-xs text-ink-subtle">
+              自动恢复通常会在 1 分钟内完成；若长时间停在这里，说明需要人工扫码。
+            </p>
+          )}
           <p className="text-xs text-ink-subtle">
             ⚠️ 二维码等同于登录凭据，因此本页仅超级管理员可见。
             扫码成功后此处会自动变回「运行中」。

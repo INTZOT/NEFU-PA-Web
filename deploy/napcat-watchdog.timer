@@ -1,0 +1,20 @@
+# NapCat 登录看门狗 —— 定时器
+#
+# 每 2 分钟检查一次。检查本身很轻（一次 HTTP + 一次 docker logs），
+# 而真正是否重启由脚本内的冷却窗口（默认 30 分钟）决定。
+#
+# Persistent=true：机器关机期间错过的执行，开机后会补一次 ——
+# 否则重启服务器后若正好掉线，要等到下一个周期才会被检查到。
+
+[Unit]
+Description=定期运行 NapCat 登录看门狗
+Requires=napcat-watchdog.service
+
+[Timer]
+OnBootSec=3min
+OnUnitActiveSec=2min
+AccuracySec=15s
+Persistent=true
+
+[Install]
+WantedBy=timers.target

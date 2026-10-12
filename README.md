@@ -223,16 +223,60 @@ fi
 | 现象 | 原因 | 处置 |
 | --- | --- | --- |
 | 每次重启要扫码 | 缺 `ACCOUNT` | ✅ 已修复 |
-| 运行中突然掉线 | **QQ 服务端使会话失效** | ⚠️ 仍需重新扫码 |
+| 运行中突然掉线 | **QQ 服务端主动踢下线** | ✅ **看门狗自动恢复**（见下） |
+| 看门狗也恢复不了 | 登录态真正失效 | ⚠️ 需人工扫码（超管面板有二维码） |
 
-**会话失效的症状**（可在 `docker compose logs napcat` 中看到，每 2 分钟一次）：
+**被踢下线的症状**（在 `docker compose logs napcat` 中可见）：
 
 ```
-[Core] [Login] Login Error,ErrType:  1  ErrCode: 3
+[KickedOffLine] [下线通知] 你的账号当前登录已失效，请重新登录。
 ```
 
-此时需要重新扫码。**注意 NapCat 没有离线消息队列** —— 掉线期间发来的消息
-**永久丢失**，不会补发。
+**注意 NapCat 没有离线消息队列** —— 掉线期间发来的消息**永久丢失**，不会补发。
+
+#### 看门狗：被踢下线后自动恢复
+
+**为什么需要它**：被踢之后，NapCat 会在**容器内部**重启进程，
+但 entrypoint 不会重跑，于是启动参数 `-q <QQ号>`（快速登录）就丢了 ——
+NapCat 退化成二维码登录、卡住等人扫，**而没人知道它掉了**（实测停摆可达数小时）。
+
+**它做什么**：每 2 分钟检查一次；发现「未连接 + 日志里有 `KickedOffLine`」时，
+重启 napcat 容器 —— 容器重启会让 entrypoint 重跑，`-q` 参数恢复，于是自动快速登录。
+
+```
+scripts/napcat_watchdog.py     看门狗脚本
+state/napcat-watchdog.json     它的状态（供超管面板读取）
+deploy/napcat-watchdog.{service,timer}
+```
+
+**安装**（需要 sudo）：
+
+```bash
+sudo cp ~/nefu-pa-web/deploy/napcat-watchdog.service \
+        ~/nefu-pa-web/deploy/napcat-watchdog.timer /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now napcat-watchdog.timer
+```
+
+**查看**：
+
+```bash
+systemctl list-timers napcat-watchdog.timer
+journalctl -u napcat-watchdog.service -n 30 --no-pager
+```
+
+**防循环**：若登录态是真失效（不是被踢），重启也登不上。因此脚本在
+**冷却窗口（30 分钟）内只尝试一次**，失败就停下，并把尝试记录写进
+`state/napcat-watchdog.json`；**超管面板会显示「已尝试自动恢复但未成功」，
+并直接给出二维码**。
+
+**手动跑一次**（排查时有用）：
+
+```bash
+cd ~/nefu-pa-web
+python3 scripts/napcat_watchdog.py --dry-run   # 只报告，不重启
+python3 scripts/napcat_watchdog.py             # 真跑一次
+```
 
 ---
 
