@@ -30,9 +30,14 @@ export default async function HomePage() {
             <p>
               你好，<span className="font-semibold">{user.name}</span>
             </p>
-            <Link href="/me" className="inline-block text-sm text-blue-600 hover:underline">
-              进入个人主页 →
-            </Link>
+            <div className="flex flex-wrap gap-4 text-sm">
+              <Link href="/me" className="text-blue-600 hover:underline">
+                进入个人主页 →
+              </Link>
+              <Link href="/club" className="text-neutral-500 hover:text-neutral-900">
+                社团介绍
+              </Link>
+            </div>
           </div>
         ) : (
           <div className="space-y-3">
@@ -72,7 +77,11 @@ export default async function HomePage() {
                       置顶
                     </span>
                   ) : null}
-                  <h3 className="font-medium">{a.title}</h3>
+                  <h3 className="font-medium">
+                    <Link href={`/announcements/${a.id}`} className="hover:underline">
+                      {a.title}
+                    </Link>
+                  </h3>
                 </div>
                 <p className="mt-1 line-clamp-3 text-sm whitespace-pre-wrap text-neutral-600">
                   {a.content}

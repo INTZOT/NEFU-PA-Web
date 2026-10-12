@@ -24,6 +24,9 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             <Link href="/" className="font-semibold">
               匹克球社团
             </Link>
+            <Link href="/club" className="text-neutral-600 hover:text-neutral-900">
+              社团介绍
+            </Link>
             <Link href="/announcements" className="text-neutral-600 hover:text-neutral-900">
               公告
             </Link>

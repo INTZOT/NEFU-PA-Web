@@ -15,7 +15,8 @@ export type AuditAction =
   | "role.revoke"
   | "announcement.create"
   | "announcement.update"
-  | "announcement.delete";
+  | "announcement.delete"
+  | "club.update";
 
 export interface AuditEntry {
   id: string;
@@ -79,4 +80,5 @@ export const ACTION_LABEL: Record<AuditAction, string> = {
   "announcement.create": "发布公告",
   "announcement.update": "修改公告",
   "announcement.delete": "删除公告",
+  "club.update": "修改社团介绍",
 };

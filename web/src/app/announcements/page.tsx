@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { listPublished } from "@/modules/announcement/service";
 
 function formatDate(value: string): string {
@@ -34,7 +35,11 @@ export default async function AnnouncementsPage() {
                     {a.category}
                   </span>
                 ) : null}
-                <h2 className="font-semibold">{a.title}</h2>
+                <h2 className="font-semibold">
+                  <Link href={`/announcements/${a.id}`} className="hover:underline">
+                    {a.title}
+                  </Link>
+                </h2>
               </div>
               <p className="mt-2 text-sm whitespace-pre-wrap text-neutral-700">{a.content}</p>
               <p className="mt-3 text-xs text-neutral-400">

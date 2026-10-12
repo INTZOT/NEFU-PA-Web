@@ -28,6 +28,16 @@ export default async function AdminPage() {
           </p>
         </Link>
 
+        <Link
+          href="/admin/club"
+          className="rounded-lg border border-neutral-200 bg-white p-4 transition hover:border-neutral-900"
+        >
+          <h2 className="font-semibold">社团介绍</h2>
+          <p className="mt-1 text-sm text-neutral-500">
+            概况、组织架构、章程、联系方式（游客可见）
+          </p>
+        </Link>
+
         {isSuperAdmin(user) ? (
           <Link
             href="/admin/members"
