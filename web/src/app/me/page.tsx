@@ -5,7 +5,7 @@ import { query, queryOne } from "@/lib/db";
 import { listPendingForUser } from "@/modules/event/pairing";
 import { listMine as listMyEvents } from "@/modules/event/service";
 import { listMine as listMyRooms } from "@/modules/room/service";
-import { getActiveSeason, getMyRank } from "@/modules/rating/leaderboard";
+import { getActiveSeason, getMyRank, getHidden } from "@/modules/rating/leaderboard";
 import { BIO_MAX } from "@/modules/profile/service";
 import { Notice } from "@/components/Notice";
 import { SelfRatingSlider } from "@/components/SelfRatingSlider";
@@ -63,9 +63,15 @@ export default async function MePage({
     : null;
 
   const rank = season ? await getMyRank(season.id, user.id) : null;
+  // 是否已退出排行榜（D-39）
+  const hidden = season ? await getHidden(season.id, user.id) : false;
+
+  // ⚠️ 总人数必须与榜单用**同一套过滤条件**（排除已退出者），
+  // 否则会出现「我第 3 / 共 5 人」而榜单上只有 4 人这种自相矛盾的显示。
   const totalRated = season
     ? await queryOne<{ n: string }>(
-        "SELECT count(*)::text AS n FROM season_ratings WHERE season_id = $1",
+        `SELECT count(*)::text AS n FROM season_ratings
+          WHERE season_id = $1 AND NOT leaderboard_hidden`,
         [season.id],
       )
     : null;
@@ -228,10 +234,16 @@ export default async function MePage({
               <div>
                 <span className="text-xs text-ink-muted">排名</span>
                 <p className="text-2xl font-bold tabular-nums">
-                  {rank ?? "—"}
-                  {rank && total > 0 ? (
-                    <span className="text-sm font-normal text-ink-subtle"> / {total}</span>
-                  ) : null}
+                  {hidden ? (
+                    <span className="text-base font-normal text-ink-subtle">已退出</span>
+                  ) : (
+                    <>
+                      {rank ?? "—"}
+                      {rank && total > 0 ? (
+                        <span className="text-sm font-normal text-ink-subtle"> / {total}</span>
+                      ) : null}
+                    </>
+                  )}
                 </p>
               </div>
               <div>
@@ -266,6 +278,37 @@ export default async function MePage({
         <p className="mt-3 text-xs text-ink-muted">
           比赛积分只由官方比赛产生，按标准 ELO 结算（K=40），按学年归档。
         </p>
+
+        {/* ---- 是否参与排行（D-39）---- */}
+        {season ? (
+          <div id="leaderboard" className="mt-4 rounded-lg border border-line bg-canvas p-3">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <p className="text-sm font-medium">
+                  参与排行榜：
+                  <span className={hidden ? "text-ink-muted" : "text-ok"}>
+                    {hidden ? "已关闭" : "已开启"}
+                  </span>
+                </p>
+                <p className="mt-1 text-xs text-ink-muted">
+                  关闭后你<strong>暂时不显示在排行榜上</strong>，可随时恢复。
+                  <br />
+                  比赛积分与战绩<strong>照常累积</strong>
+                  ，也不影响你参加比赛和其他人对你的积分结算。
+                </p>
+              </div>
+              <form action="/api/me/leaderboard" method="post">
+                <input type="hidden" name="hidden" value={hidden ? "0" : "1"} />
+                <button
+                  type="submit"
+                  className="rounded-lg border border-line-strong px-3 py-1.5 text-sm transition hover:border-brand hover:text-brand"
+                >
+                  {hidden ? "恢复参与排行" : "退出排行榜"}
+                </button>
+              </form>
+            </div>
+          </div>
+        ) : null}
       </section>
 
       {/* ---- 个人自评分 ---- */}

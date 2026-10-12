@@ -60,13 +60,17 @@ export async function getLeaderboard(
   // 说明：这段之前写成「先给 rows 拼 $1/$2，再给 count 把 $3 换成 $2」，
   // 结果两边的占位符与参数数组对不上（bind message supplies 2 parameters, but
   // prepared statement requires 3），搜索一用就 500。现在改为分别构造，直白可读。
+  // ⚠️ 所有榜单查询都必须带 `NOT r.leaderboard_hidden`（D-39）：
+  //   用户可自愿退出排行，隐藏者**整个从排名计算中剔除**，
+  //   这样「榜上第 N 名」就等于「可见者中的第 N 名」。
+  //   若改为「占位但显示已隐藏」，榜单会出现读者无法解释的空洞。
   const filter = search ? "AND (u.name ILIKE $2 OR u.student_id ILIKE $2)" : "";
 
   const countParams: unknown[] = search ? [seasonId, `%${search}%`] : [seasonId];
   const totalRow = await queryOne<{ n: string }>(
     `SELECT count(*)::text AS n
        FROM season_ratings r JOIN users u ON u.id = r.user_id
-      WHERE r.season_id = $1 ${filter}`,
+      WHERE r.season_id = $1 AND NOT r.leaderboard_hidden ${filter}`,
     countParams,
   );
   const total = Number(totalRow?.n ?? 0);
@@ -88,7 +92,7 @@ export async function getLeaderboard(
     `SELECT r.user_id, u.name, r.rating, r.matches, r.wins, r.losses
        FROM season_ratings r
        JOIN users u ON u.id = r.user_id
-      WHERE r.season_id = $1 ${filter}
+      WHERE r.season_id = $1 AND NOT r.leaderboard_hidden ${filter}
       ORDER BY r.rating DESC, r.matches DESC, u.name
       LIMIT ${limitIdx} OFFSET ${offsetIdx}`,
     rowsParams,
@@ -118,14 +122,47 @@ export async function getMyRank(
   seasonId: string,
   userId: string,
 ): Promise<number | null> {
+  // 隐藏者不参与排名计算，因此**没有名次**可显示（D-39）。
+  // 与榜单查询保持同一套过滤条件 —— 否则会出现
+  // 「自己看到第 3 名，但榜上找不到自己」这种自相矛盾的情况。
   const row = await queryOne<{ rank: string }>(
     `SELECT rank FROM (
        SELECT r.user_id,
               rank() OVER (ORDER BY r.rating DESC, r.matches DESC) AS rank
          FROM season_ratings r
-        WHERE r.season_id = $1
+        WHERE r.season_id = $1 AND NOT r.leaderboard_hidden
      ) t WHERE t.user_id = $2`,
     [seasonId, userId],
   );
   return row ? Number(row.rank) : null;
+}
+
+/**
+ * 该用户本赛季是否已退出排行榜。
+ *
+ * 取不到记录时返回 false（还没参与赛季 = 谈不上隐藏）。
+ */
+export async function getHidden(seasonId: string, userId: string): Promise<boolean> {
+  const row = await queryOne<{ leaderboard_hidden: boolean }>(
+    "SELECT leaderboard_hidden FROM season_ratings WHERE season_id = $1 AND user_id = $2",
+    [seasonId, userId],
+  );
+  return row?.leaderboard_hidden === true;
+}
+
+/**
+ * 设置是否参与排行。
+ *
+ * 只在已有本赛季积分记录时才有意义 —— 若用户还没有任何比赛，
+ * 不存在 season_ratings 行，他本来就不在榜上。
+ */
+export async function setHidden(
+  seasonId: string,
+  userId: string,
+  hidden: boolean,
+): Promise<void> {
+  await query(
+    "UPDATE season_ratings SET leaderboard_hidden = $3 WHERE season_id = $1 AND user_id = $2",
+    [seasonId, userId, hidden],
+  );
 }
