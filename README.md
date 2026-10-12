@@ -241,6 +241,7 @@ gunzip -c backup-2026-10-11.sql.gz | docker compose exec -T db psql -U nefu -d n
 
 | 文档 | 内容 |
 | --- | --- |
+| [CHANGELOG.md](CHANGELOG.md) | **版本更新日志**（当前 v1.4.0） |
 | [status.md](docs/status.md) | 进度看板 |
 | [scope.md](docs/scope.md) | 范围声明：做什么、不做什么 |
 | [decisions.md](docs/decisions.md) | **35 条**架构决策及其取舍（D-01 … D-35） |
