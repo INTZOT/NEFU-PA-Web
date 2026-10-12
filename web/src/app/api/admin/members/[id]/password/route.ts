@@ -1,4 +1,4 @@
-import { getCurrentUser } from "@/lib/session";
+import { getCurrentUser, invalidateAllSessions } from "@/lib/session";
 import { isAdmin } from "@/lib/roles";
 import { redirectTo } from "@/lib/redirect";
 import { hashPassword } from "@/lib/password";
@@ -40,11 +40,20 @@ export async function POST(
   const hash = await hashPassword(password);
   await setPasswordHash(id, hash);
 
+  // 密码是账号的唯一凭据：改密码必须让此前基于旧密码的会话全部失效。
+  // 否则「管理员代设密码」这个兜底手段**踢不掉已经入侵的人** ——
+  // 而「重置失误/账号被盗」恰恰是这条兜底通道要解决的场景（D-16）。
+  const killed = await invalidateAllSessions(id);
+
   const info = await getCredentialInfo(id);
-  await record(user, "password.admin", `${info?.name ?? id}（代设密码）`);
+  await record(
+    user,
+    "password.admin",
+    `${info?.name ?? id}（代设密码，同时失效 ${killed} 个登录会话）`,
+  );
 
   return redirectTo(
     request,
-    `${back}?ok=${encodeURIComponent(`已为 ${info?.name ?? "该成员"} 设置临时密码，请让他登录后自行修改`)}`,
+    `${back}?ok=${encodeURIComponent(`已为 ${info?.name ?? "该成员"} 设置临时密码，其原有登录已全部失效`)}`,
   );
 }

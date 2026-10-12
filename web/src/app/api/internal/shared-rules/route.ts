@@ -14,6 +14,8 @@
 import { NextResponse } from "next/server";
 import { hashPassword } from "@/lib/password";
 import { generateInviteCode, isValidInviteCode, normalizeInviteCode } from "@/lib/invite-code";
+import { invalidateAllSessions } from "@/lib/session";
+import { queryOne } from "@/lib/db";
 
 function authorized(request: Request): boolean {
   const expected = process.env.SHARED_RULES_TOKEN;
@@ -36,7 +38,12 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
 
-  const body = (await request.json().catch(() => null)) as { op?: string; password?: string; code?: string } | null;
+  const body = (await request.json().catch(() => null)) as {
+    op?: string;
+    password?: string;
+    code?: string;
+    qqNumber?: string;
+  } | null;
   if (!body?.op) return NextResponse.json({ error: "missing op" }, { status: 400 });
 
   switch (body.op) {
@@ -53,6 +60,26 @@ export async function POST(request: Request) {
       if (!body.code) return NextResponse.json({ error: "missing code" }, { status: 400 });
       const code = normalizeInviteCode(body.code);
       return NextResponse.json({ code, valid: isValidInviteCode(code) });
+    }
+
+    /**
+     * 失效某账号的全部登录会话。
+     *
+     * 用途：用户在 QQ 里重置密码后，机器人调用它踢掉旧的登录态。
+     * 为什么放在网站侧而不是让机器人直接删表：
+     *   与密码加密同理 —— 「改密码后该做什么」属于账号规则，
+     *   规则只能有一份实现，否则机器人侧漏掉一步就留下安全缺口。
+     * 用 QQ 号定位（机器人只知道 QQ 号，不知道内部 user_id）。
+     */
+    case "invalidate-sessions": {
+      if (!body.qqNumber) return NextResponse.json({ error: "missing qqNumber" }, { status: 400 });
+      const row = await queryOne<{ id: string }>(
+        "SELECT id FROM users WHERE qq_number = $1 LIMIT 1",
+        [body.qqNumber],
+      );
+      if (!row) return NextResponse.json({ error: "user not found" }, { status: 404 });
+      const killed = await invalidateAllSessions(row.id);
+      return NextResponse.json({ killed });
     }
 
     default:

@@ -133,9 +133,11 @@ async def _apply_new_password(send, user_id: str, user: dict, pending: dict, pla
     try:
         hashed = await asyncio.to_thread(shared_rules.hash_password, plain)
         await asyncio.to_thread(db.complete_reset, pending["id"], user["id"], hashed)
+        # 密码是这个账号的唯一凭据：改了就必须让旧登录态失效
+        await asyncio.to_thread(shared_rules.invalidate_sessions, user_id)
     except Exception:
         log.exception("重置密码失败")
         await _reply(send, user_id, "重置失败，请稍后再试或联系管理员。")
         return
 
-    await _reply(send, user_id, "密码已重置，可以用新密码登录了。")
+    await _reply(send, user_id, "密码已重置，其他设备上的登录已失效，可以用新密码登录了。")

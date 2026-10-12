@@ -4,6 +4,36 @@
 {$SITE_DOMAIN} {
 	encode zstd gzip
 
+	# ---------------------------------------------------------------
+	# 安全响应头（安全 review 的整改项之一）
+	#
+	# 说明：应用本身没有 XSS 漏洞（无 dangerouslySetInnerHTML、React 默认转义），
+	#       因此这些头属于**纵深防御** —— 万一将来引入漏洞，它们能兜住一部分。
+	# ---------------------------------------------------------------
+	header {
+		# 强制浏览器只用 HTTPS 访问（含子域），有效期一年。
+		# 注意：一旦下发且浏览器记住了，回退到 HTTP 会在一年内无法访问 —— 本项目始终有证书，无风险。
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+
+		# 禁止浏览器猜测 MIME 类型（防止把上传的图片当脚本执行）
+		X-Content-Type-Options "nosniff"
+
+		# 禁止被嵌入 iframe（防点击劫持）
+		X-Frame-Options "DENY"
+
+		# 跨站跳转时不泄露完整 URL（避免把带查询参数的地址泄露给第三方）
+		Referrer-Policy "strict-origin-when-cross-origin"
+
+		# 关闭用不到的浏览器特性
+		Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=()"
+
+		# 注意：**内容安全策略（CSP）不在这里设置**。
+		# 原因：Next.js 会内联注入 3 个关键脚本（Turbopack 的 chunk 清单、RSC payload），
+		#       它们是 React 水合的前提。要让它们执行又不放弃 CSP，就必须用 nonce，
+		#       而 nonce 需要与脚本标签同源生成 —— 因此 CSP 由 web 侧的 middleware 负责
+		#       （见 web/src/middleware.ts）。Caddy 再设一份会把它覆盖掉，故此处留空。
+	}
+
 	reverse_proxy web:3000
 
 	log {

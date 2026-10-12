@@ -62,3 +62,16 @@ def hash_password(plain: str) -> str:
     if not isinstance(hashed, str) or not hashed:
         raise SharedRulesError("接口未返回密码散列")
     return hashed
+
+
+def invalidate_sessions(qq_number: str) -> int:
+    """失效该账号的全部登录会话，返回被踢掉的数量。
+
+    为什么必须做：密码是这个账号的**唯一凭据**。重置密码后若旧会话仍有效，
+    「重置密码」在安全意义上等于没有发生 —— 已经拿到会话的人可以继续用。
+
+    规则实现在网站侧（与密码加密同理）：机器人只调用，不自己删表。
+    """
+    result = _post({"op": "invalidate-sessions", "qqNumber": qq_number})
+    killed = result.get("killed")
+    return int(killed) if isinstance(killed, int) else 0
