@@ -62,6 +62,18 @@ export default async function AdminPage() {
           </Link>
         ) : null}
 
+        {isSuperAdmin(user) ? (
+          <Link
+            href="/admin/seasons"
+            className="rounded-lg border border-neutral-200 bg-white p-4 transition hover:border-neutral-900"
+          >
+            <h2 className="font-semibold">赛季管理</h2>
+            <p className="mt-1 text-sm text-neutral-500">
+              配置学期起止日期、开启新赛季（仅超级管理员可见）
+            </p>
+          </Link>
+        ) : null}
+
         <Link
           href="/admin/events"
           className="rounded-lg border border-neutral-200 bg-white p-4 transition hover:border-neutral-900"
@@ -69,6 +81,16 @@ export default async function AdminPage() {
           <h2 className="font-semibold">社团活动</h2>
           <p className="mt-1 text-sm text-neutral-500">
             发布赛事、查看报名与候补
+          </p>
+        </Link>
+
+        <Link
+          href="/admin/rating"
+          className="rounded-lg border border-neutral-200 bg-white p-4 transition hover:border-neutral-900"
+        >
+          <h2 className="font-semibold">成绩录入</h2>
+          <p className="mt-1 text-sm text-neutral-500">
+            录入官方比赛结果，按 ELO 自动结算积分
           </p>
         </Link>
       </div>

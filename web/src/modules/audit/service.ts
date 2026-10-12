@@ -19,7 +19,11 @@ export type AuditAction =
   | "club.update"
   | "event.create"
   | "event.update"
-  | "event.checkin";
+  | "event.checkin"
+  | "rating.settle"
+  | "rating.revoke"
+  | "season.create"
+  | "season.update";
 
 export interface AuditEntry {
   id: string;
@@ -87,4 +91,8 @@ export const ACTION_LABEL: Record<AuditAction, string> = {
   "event.create": "发布活动",
   "event.update": "修改活动",
   "event.checkin": "活动签到",
+  "rating.settle": "录入比赛结果",
+  "rating.revoke": "撤销比赛结算",
+  "season.create": "开启新赛季",
+  "season.update": "修改赛季日期",
 };
