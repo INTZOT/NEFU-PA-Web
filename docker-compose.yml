@@ -75,8 +75,6 @@ services:
     environment:
       # 机器人使用受限数据库账号（见 .env.example 说明）
       DATABASE_URL: postgres://${BOT_DB_USER:-nefu_bot}:${BOT_DB_PASSWORD:?请在 .env 中设置 BOT_DB_PASSWORD}@db:5432/${POSTGRES_DB:-nefu_pa}
-      # OneBot 协议端（NapCat）地址，容器网络内可达
-      ONEBOT_WS_URL: ${ONEBOT_WS_URL:-ws://napcat:3001}
       # 共享规则接口：密码加密与邀请码生成只在网站实现（见 docs/p3-blueprint.md 第三节）
       SHARED_RULES_URL: ${SHARED_RULES_URL:-http://web:3000/api/internal/shared-rules}
       SHARED_RULES_TOKEN: ${SHARED_RULES_TOKEN:?请在 .env 中设置 SHARED_RULES_TOKEN}

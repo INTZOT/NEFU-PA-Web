@@ -14,6 +14,7 @@
 import os
 import re
 import struct
+import shutil
 import subprocess
 import sys
 import threading
@@ -22,8 +23,14 @@ import zlib
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
 CONTAINER = os.environ.get('NAPCAT_CONTAINER', 'nefu-pa-web-napcat-1')
+# 非登录 shell 下 PATH 可能不含 docker，显式解析其绝对路径
+DOCKER_BIN = shutil.which('docker') or next(
+    (p for p in ('/usr/bin/docker', '/usr/local/bin/docker') if os.path.exists(p)), 'docker')
 PORT = int(sys.argv[1]) if len(sys.argv) > 1 else int(os.environ.get('QR_PORT', '8099'))
 PNG_PATH = '/tmp/napcat-qr.png'
+# NapCat 会把当前二维码直接写成 PNG，优先用它（比从日志重建可靠得多）
+NATIVE_QR_IN_CONTAINER = '/app/napcat/cache/qrcode.png'
+NATIVE_QR_LOCAL = '/tmp/napcat-native-qr.png'
 
 QR_CHARS = set(' ' + chr(0x2588) + chr(0x2580) + chr(0x2584))
 TOP = {' ': 0, chr(0x2588): 1, chr(0x2580): 1, chr(0x2584): 0}
@@ -86,16 +93,45 @@ def extract_matrix(text):
     return matrix
 
 
-STATE = {'ts': 0.0, 'ok': False}
+STATE = {'ts': 0.0, 'ok': False, 'src': '-'}
+
+
+def copy_native_qr():
+    """把 NapCat 容器内的原生二维码文件复制出来（比解析日志可靠）。"""
+    try:
+        p = subprocess.run(
+            [DOCKER_BIN, 'cp', CONTAINER + ':' + NATIVE_QR_IN_CONTAINER, NATIVE_QR_LOCAL],
+            capture_output=True, timeout=25)
+        if p.returncode != 0:
+            STATE['err'] = p.stderr.decode('utf-8', 'replace')[:200]
+            return False
+        with open(NATIVE_QR_LOCAL, 'rb') as f:
+            head = f.read(8)
+        return head == bytes([0x89]) + b'PNG'
+    except Exception:
+        return False
 
 
 def build():
+    """优先取 NapCat 原生二维码；失败则退回从日志重建。"""
+    if copy_native_qr():
+        try:
+            with open(NATIVE_QR_LOCAL, 'rb') as src, open(PNG_PATH, 'wb') as dst:
+                dst.write(src.read())
+            STATE['ts'] = time.time()
+            STATE['ok'] = True
+            STATE['src'] = 'native'
+            return True
+        except OSError:
+            pass
+
     matrix = extract_matrix(read_log())
     if not matrix:
         return False
     write_png(PNG_PATH, matrix)
     STATE['ts'] = time.time()
     STATE['ok'] = True
+    STATE['src'] = 'log'
     return True
 
 
@@ -109,7 +145,9 @@ PAGE = (
     'p{color:#555;font-size:14px;line-height:1.6;margin:8px 0}</style></head><body>'
     '<h2>用手机 QQ 扫码登录</h2>'
     '<p>本页每 8 秒自动刷新，二维码失效后会自动换成新的。</p>'
-    '<img src=\"/qr.png?t=%d\" alt=二维码>'
+    '<img id="qr" src="/qr.png?t=%d" alt=二维码>'
+    '<script>setInterval(function(){var e=document.getElementById("qr");'
+    'e.src="/qr.png?t="+Date.now();},2000);</script>'
     '<p>扫码后 QQ 提示「允许登录」，确认即可。</p>'
     '</body></html>'
 )
