@@ -1,13 +1,16 @@
 #!/usr/bin/env bash
 # ============================================================
-# 部署 / 更新脚本（在服务器上执行）
+# 部署脚本
 #
-#   cd ~/nefu-pa-web && ./deploy.sh
+# ⚠️ 重要：本机内存仅 1.6G，**绝不能在本机构建镜像**。
+#   曾两次因在服务器上构建 Next.js 导致整机内存耗尽、SSH 失联。
 #
-# ⚠️ 为什么构建要单独一步、并限制内存：
-#   本机内存仅 1.6G，且同时运行其他项目。Next.js 构建（Turbopack）
-#   实测会吃满内存，曾导致整机失去响应、SSH 无法登录。
-#   因此这里：① 限制 Node 堆大小；② 构建期间暂停其他项目；③ 构建完成后恢复。
+# 正确流程：
+#   1. 在**开发机**上构建：  docker build -t nefu-pa-web-web:local ./web
+#   2. 传到服务器：          docker save ... | gzip | ssh 服务器 'gunzip | docker load'
+#   3. 在服务器上执行本脚本：./deploy.sh（只启动，不构建）
+#
+# 另：改动 NapCat 配置会导致它重新扫码登录，非必要时不要重启 napcat 容器。
 # ============================================================
 set -euo pipefail
 
@@ -18,30 +21,14 @@ if [ ! -f .env ]; then
   exit 1
 fi
 
-# 构建期间需要让出内存的容器（按需修改；不存在则自动忽略）
-PAUSE_CONTAINERS="${PAUSE_CONTAINERS:-rhex-worker-1 rhex-postgres-1 rhex-redis-1}"
+# 安全检查：镜像是否已就位（不存在则明确报错，而不是傻傻地开始构建）
+if ! docker image inspect nefu-pa-web-web:local >/dev/null 2>&1; then
+  echo "错误：镜像 nefu-pa-web-web:local 不存在。" >&2
+  echo "请先在开发机构建并传输：deploy 说明见本脚本顶部注释。" >&2
+  exit 1
+fi
 
-echo "=== 1/4 暂停其他项目以腾出内存 ==="
-for c in $PAUSE_CONTAINERS; do
-  if docker ps --format "{{.Names}}" | grep -qx "$c"; then
-    docker stop "$c" >/dev/null && echo "  已暂停 $c"
-  fi
-done
-
-restore() {
-  echo "=== 4/4 恢复其他项目 ==="
-  for c in $PAUSE_CONTAINERS; do
-    if docker ps -a --format "{{.Names}}" | grep -qx "$c"; then
-      docker start "$c" >/dev/null 2>&1 && echo "  已恢复 $c" || true
-    fi
-  done
-}
-trap restore EXIT
-
-echo "=== 2/4 构建镜像（Node 堆上限由 web/Dockerfile 设定）==="
-docker build -t nefu-pa-web-web:local ./web
-
-echo "=== 3/4 启动服务（不重建）==="
+echo "=== 启动服务（不构建）==="
 docker compose up -d db web caddy
 
 echo "=== 等待健康检查 ==="
