@@ -1,0 +1,59 @@
+import Link from "next/link";
+
+export default async function LoginPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ error?: string }>;
+}) {
+  const { error } = await searchParams;
+
+  return (
+    <div className="mx-auto max-w-md space-y-5">
+      <div>
+        <h1 className="text-xl font-bold">登录</h1>
+        <p className="mt-1 text-sm text-neutral-600">可用学号或 QQ 号登录。</p>
+      </div>
+
+      {error ? (
+        <p className="rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+          {error}
+        </p>
+      ) : null}
+
+      <form action="/api/auth/login" method="post" className="space-y-4">
+        <label className="block">
+          <span className="mb-1 block text-sm font-medium">学号 或 QQ 号</span>
+          <input
+            name="ident"
+            required
+            className="w-full rounded border border-neutral-300 px-3 py-2 outline-none focus:border-neutral-900"
+          />
+        </label>
+
+        <label className="block">
+          <span className="mb-1 block text-sm font-medium">密码</span>
+          <input
+            name="password"
+            type="password"
+            required
+            className="w-full rounded border border-neutral-300 px-3 py-2 outline-none focus:border-neutral-900"
+          />
+        </label>
+
+        <button type="submit" className="w-full rounded bg-neutral-900 px-4 py-2 text-white">
+          登录
+        </button>
+      </form>
+
+      <div className="space-y-1 text-sm text-neutral-600">
+        <p>
+          忘记密码？在 QQ 群私聊机器人发送「重置密码」即可。
+        </p>
+        <p>
+          还没有账号？
+          <Link href="/register" className="text-blue-600 hover:underline">去注册</Link>
+        </p>
+      </div>
+    </div>
+  );
+}
