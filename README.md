@@ -97,26 +97,55 @@
 | 端口 | 放行 80 与 443 |
 | 超管 QQ 号 | 在 `.env` 中填 `SUPER_ADMIN_QQ`（超管为预先指定，不靠注册顺序） |
 
+### ⚠️ 铁律：部署机不做构建
+
+本项目现在的部署机是 **1.6G 内存的入门云服务器**，它同时在跑其他项目。
+
+**在这台机器上构建 Next.js 会耗尽内存、导致整机失去响应（SSH 都连不上）。**
+这个错误实际发生过**两次**，两次都需要重启服务器。
+
+所以流程固定为：**开发机构建 → 传镜像 → 部署机只启动**。
+
 ### 首次部署
 
-`bash`
+**第一步：在开发机（有充足内存的机器）上构建镜像**
+
+```bash
 git clone https://github.com/INTZOT/NEFU-PA-Web.git
 cd NEFU-PA-Web
 
+# 构建网站镜像（约 1 分钟）
+docker build -t nefu-pa-web-web:local ./web
+
+# 构建机器人镜像
+docker build -t nefu-pa-web-bot:local ./bot
+```
+
+**第二步：把镜像传到部署机**
+
+```bash
+docker save nefu-pa-web-web:local | gzip -1 | ssh 用户@服务器 'gunzip | docker load'
+docker save nefu-pa-web-bot:local | gzip -1 | ssh 用户@服务器 'gunzip | docker load'
+```
+
+**第三步：在部署机上准备配置并启动**
+
+```bash
+cd NEFU-PA-Web
 cp .env.example .env
-vi .env          # 填入域名、数据库密码、SESSION_SECRET
+vi .env          # 填入域名、数据库密码、SESSION_SECRET、超管 QQ 等
 
-docker compose up -d --build
-`
+./deploy.sh      # 只启动，绝不构建；镜像缺失会直接报错
+```
 
-启动后访问你的域名即可。Caddy 会自动申请 HTTPS 证书（首次可能需要几十秒）。
+启动后访问域名即可。Caddy 会自动申请 HTTPS 证书（首次可能需要几十秒）。
 
 ### 验证
 
-`bash`
-docker compose ps                      # 各服务应为 healthy
-curl -fsS https://<你的域名>/healthz    # 应返回 ok
-`
+```bash
+docker compose ps                            # 各服务应为 healthy
+curl -fsS https://<你的域名>/api/healthz     # 应返回 ok
+```
 
 ### 数据库表结构
 
@@ -130,16 +159,33 @@ curl -fsS https://<你的域名>/healthz    # 应返回 ok
 
 机器人需要它才能收发 QQ 消息。此服务**默认不随 compose 启动**（它有交互式登录，不适合自动化），需单独运行。
 
-`bash`
+```bash
 docker compose --profile napcat up -d napcat
-docker logs -f napcat       # 查看扫码登录提示
-`
+```
+
+### 扫码登录：用二维码页
+
+**不要**从日志里复制终端二维码再转发——登录码有效期很短，往往还没扫就过期了。
+项目自带一个**实时二维码页**，始终显示当前有效的码：
+
+```bash
+# 在部署机上启动（服务器自带 Python 3）
+cd ~/nefu-pa-web && nohup python3 scripts/qr_server.py 8099 &
+```
+
+然后浏览器打开 **`https://<你的域名>/qr`**，用手机 QQ 扫码。页面每 2 秒自动刷新，
+码失效后会自动换成新的。
+
+> 原理：NapCat 会把当前二维码写到容器内 `/app/napcat/cache/qrcode.png`，
+> 该脚本把它取出来并提供网页。登录完成后建议停掉该脚本。
 
 ### ⚠️ 必须知道的运维事项
 
 | 事项 | 说明 |
 | --- | --- |
-| **首次需扫码** | 用手机 QQ 扫码登录 |
+| **首次需扫码** | 用手机 QQ 扫码登录（见上方二维码页） |
+| **改动配置会掉登录** | **每次重启 napcat 容器都要重新扫码**。改网络配置请尽量攒着一起改，改完一次扫一次 |
+| **服务器重启也要重扫** | NapCat 容器重启后不会自动快速登录 |
 | **会话会失效** | 掉线或被踢后需重新扫码 |
 | **账号有被封风险** | 第三方协议端属灰色地带，已评估接受 |
 | **被封后无兜底** | 换一个 QQ 号接上即可，**数据无需迁移**（全在数据库里） |
@@ -171,8 +217,8 @@ gunzip -c backup-2026-10-11.sql.gz | docker compose exec -T db psql -U nefu -d n
 | 阶段 | 内容 | 状态 |
 | --- | --- | --- |
 | **1. 地基** | 仓库结构、compose 编排、数据库表结构、部署手册 | ✅ **已完成** |
-| 2. 账号体系 | 注册、登录、会话、超管初始化 | 未开始 |
-| 3. 机器人 | NapCat 接入、注册发码、重置密码、共享规则 | 未开始 |
+| **2. 账号体系** | 注册、登录、会话、超管初始化 | ✅ **已完成** |
+| **3. 机器人** | NapCat 接入、注册发码、重置密码、共享规则 | ✅ **核心链路已跑通**（真实用户验证） |
 | 4. 展示区 | 首页、社团介绍、公告 | 未开始 |
 | 5. 活动 | 赛事、报名、候补、搭档、签到 | 未开始 |
 | 6. 约球 | 房间状态机 | 未开始 |
