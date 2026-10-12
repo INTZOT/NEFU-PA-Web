@@ -2,6 +2,7 @@ import { getCurrentUser } from "@/lib/session";
 import { isAdmin } from "@/lib/roles";
 import { redirectTo } from "@/lib/redirect";
 import { create, parseInput } from "@/modules/announcement/service";
+import { record } from "@/modules/audit/service";
 
 export async function POST(request: Request) {
   const user = await getCurrentUser();
@@ -23,5 +24,7 @@ export async function POST(request: Request) {
   }
 
   await create(parsed.value, user.id);
+  await record(user, "announcement.create", parsed.value.title);
+
   return redirectTo(request, "/admin/announcements?ok=" + encodeURIComponent("公告已发布"));
 }

@@ -51,6 +51,14 @@ export async function listMembers(): Promise<MemberRow[]> {
   }));
 }
 
+/** 取成员姓名（用于写操作记录）。不存在返回 null。 */
+export async function getMemberName(userId: string): Promise<string | null> {
+  const row = await queryOne<{ name: string }>("SELECT name FROM users WHERE id = $1", [
+    userId,
+  ]);
+  return row?.name ?? null;
+}
+
 export type SetRoleResult = { ok: true } | { ok: false; error: string };
 
 /**

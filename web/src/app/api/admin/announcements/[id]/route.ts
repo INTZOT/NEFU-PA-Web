@@ -2,6 +2,7 @@ import { getCurrentUser } from "@/lib/session";
 import { isAdmin } from "@/lib/roles";
 import { redirectTo } from "@/lib/redirect";
 import { update, parseInput } from "@/modules/announcement/service";
+import { record } from "@/modules/audit/service";
 
 export async function POST(
   request: Request,
@@ -26,5 +27,7 @@ export async function POST(
   }
 
   await update(id, parsed.value);
+  await record(user, "announcement.update", parsed.value.title);
+
   return redirectTo(request, `/admin/announcements/${id}?ok=${encodeURIComponent("已保存")}`);
 }

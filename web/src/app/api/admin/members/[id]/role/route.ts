@@ -1,7 +1,8 @@
 import { getCurrentUser } from "@/lib/session";
 import { isSuperAdmin } from "@/lib/roles";
 import { redirectTo } from "@/lib/redirect";
-import { setRole } from "@/modules/account/admin";
+import { setRole, getMemberName } from "@/modules/account/admin";
+import { record } from "@/modules/audit/service";
 
 export async function POST(
   request: Request,
@@ -22,10 +23,20 @@ export async function POST(
     return redirectTo(request, `/admin/members?error=${encodeURIComponent("角色值不合法")}`);
   }
 
+  // 先取名字：角色变更后无法再区分「刚被设为管理员的人是谁」的旧角色，
+  // 但名字与本次动作用来写日志，必须在成功前拿到
+  const targetName = await getMemberName(id);
+
   const result = await setRole(id, role, user.id);
   if (!result.ok) {
     return redirectTo(request, `/admin/members?error=${encodeURIComponent(result.error)}`);
   }
+
+  await record(
+    user,
+    role === "admin" ? "role.grant" : "role.revoke",
+    `${targetName ?? "（未知成员）"} → ${role === "admin" ? "管理员" : "成员"}`,
+  );
 
   const message = role === "admin" ? "已设为管理员" : "已取消管理员";
   return redirectTo(request, `/admin/members?ok=${encodeURIComponent(message)}`);

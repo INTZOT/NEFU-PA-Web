@@ -40,6 +40,18 @@ export default async function AdminPage() {
           </Link>
         ) : null}
 
+        {isSuperAdmin(user) ? (
+          <Link
+            href="/admin/audit"
+            className="rounded-lg border border-neutral-200 bg-white p-4 transition hover:border-neutral-900"
+          >
+            <h2 className="font-semibold">操作记录</h2>
+            <p className="mt-1 text-sm text-neutral-500">
+              谁在什么时候做了什么（仅超级管理员可见）
+            </p>
+          </Link>
+        ) : null}
+
         <div className="rounded-lg border border-dashed border-neutral-200 p-4">
           <h2 className="font-semibold text-neutral-400">赛事与活动</h2>
           <p className="mt-1 text-sm text-neutral-400">

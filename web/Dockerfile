@@ -32,8 +32,13 @@ COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 COPY --from=builder --chown=nextjs:nodejs /app/public ./public
 
-# 运维脚本（初始化超管与赛季）
+# 运维脚本（初始化超管与赛季、执行数据库迁移）
 COPY --from=builder --chown=nextjs:nodejs /app/scripts ./scripts
+
+# 数据库迁移文件。
+# 为什么放在 web 下：执行迁移的是 web 容器（它已有 pg 依赖与 DATABASE_URL），
+# 而迁移文件必须随镜像一起走，才能进到容器里被执行。
+COPY --from=builder --chown=nextjs:nodejs /app/db ./db
 COPY --from=builder --chown=nextjs:nodejs /app/bin ./bin
 
 USER nextjs
