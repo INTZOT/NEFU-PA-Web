@@ -11,7 +11,9 @@
  * 因此把规则集中在这里，页面与接口只负责调用。
  */
 
+import type { PoolClient } from "pg";
 import { query, queryOne, withTransaction } from "@/lib/db";
+import { record as notify } from "@/modules/notification/service";
 
 export type EventFormat = "singles" | "doubles";
 export type EventStatus = "draft" | "open" | "closed" | "finished";
@@ -377,7 +379,57 @@ export type CancelResult =
  * 返回 promoted 为被自动递补者的 user_id（无则为 null）。
  */
 export async function cancel(userId: string, eventId: string): Promise<CancelResult> {
-  return withTransaction(async (client) => {
+  const result = await withTransaction(async (client) => {
+    return cancelTx(client, userId, eventId);
+  });
+
+  if (!result.ok) return result;
+
+  // 通知在事务之后发。
+  const title = result.eventTitle;
+  const link = "/events/" + eventId;
+
+  // ① 候补被自动递补 —— 这条最要紧：不通知他就不知道自己已经拿到名额了。
+  if (result.promoted) {
+    await notify({
+      userId: result.promoted,
+      kind: "event.promoted",
+      title: "你已从候补转为正式报名",
+      body: "活动：" + title,
+      link,
+      dedupeKey: null,
+    });
+  }
+
+  // ② 搭档因你取消而一起失去名额（D-28：整队释放）
+  for (const pid of result.alsoReleased) {
+    await notify({
+      userId: pid,
+      kind: "event.released",
+      title: "你的报名已被释放",
+      body: "活动：" + title + "\n搭档取消了报名，按规则整队释放名额。",
+      link,
+      dedupeKey: null,
+    });
+  }
+
+  return { ok: true, promoted: result.promoted };
+}
+
+/** 取消报名的事务部分：多返回发通知所需的信息。 */
+async function cancelTx(
+  client: PoolClient,
+  userId: string,
+  eventId: string,
+): Promise<
+  | {
+      ok: true;
+      promoted: string | null;
+      eventTitle: string;
+      alsoReleased: string[];
+    }
+  | { ok: false; error: string }
+> {
     const eventRow = await client.query<EventRow>(
       `SELECT ${EVENT_COLUMNS} FROM events WHERE id = $1 FOR UPDATE`,
       [eventId],
@@ -447,8 +499,12 @@ export async function cancel(userId: string, eventId: string): Promise<CancelRes
       );
     }
 
-    return { ok: true, promoted };
-  });
+    return {
+      ok: true,
+      promoted,
+      eventTitle: event.title,
+      alsoReleased: partner.rows.map((r: { partner_id: string }) => r.partner_id),
+    };
 }
 
 /** countOccupied 的事务内版本（复用同一 client）。 */

@@ -18,7 +18,9 @@
  * 「过期」这一状态只在有人访问时才变为可见 —— 对本场景完全够用。
  */
 
+import type { PoolClient } from "pg";
 import { query, queryOne, withTransaction } from "@/lib/db";
+import { record as notify } from "@/modules/notification/service";
 
 export const ROOM_TTL_HOURS = 24;
 
@@ -233,12 +235,38 @@ export type ActionResult =
 
 /** 申请加入。满员时拒绝（房间此时已被锁死）。 */
 export async function apply(roomId: string, userId: string): Promise<ActionResult> {
-  return withTransaction(async (client) => {
-    // 锁房间行：申请要读成员数，必须与审批/退出串行
-    const room = await client.query<{ status: RoomStatus; initiator_id: string; capacity: number }>(
-      "SELECT status, initiator_id, capacity FROM match_rooms WHERE id = $1 FOR UPDATE",
-      [roomId],
-    );
+  const result = await withTransaction(async (client) => {
+    return applyTx(client, roomId, userId);
+  });
+
+  if (!result.ok) return result;
+
+  // 通知在事务**之后**发（见 notifyRoom 的说明）
+  const [slot, who] = await Promise.all([roomSlot(roomId), userName(userId)]);
+  await notifyRoom({
+    roomId,
+    to: result.initiatorId,
+    kind: "room.applied",
+    title: `${who} 申请加入你的约球`,
+    body: `时间：${slot}`,
+    // 同一个约球被多人连着申请时合并成一条，避免刷屏
+    dedupeKey: `room.applied:${roomId}`,
+  });
+
+  return { ok: true };
+}
+
+/** 申请的事务部分：可复用的内部实现，返回发起人 id 供事务后发通知。 */
+async function applyTx(
+  client: PoolClient,
+  roomId: string,
+  userId: string,
+): Promise<{ ok: true; initiatorId: string } | { ok: false; error: string }> {
+  // 锁房间行：申请要读成员数，必须与审批/退出串行
+  const room = await client.query<{ status: RoomStatus; initiator_id: string; capacity: number }>(
+    "SELECT status, initiator_id, capacity FROM match_rooms WHERE id = $1 FOR UPDATE",
+    [roomId],
+  );
     const r = room.rows[0];
     if (!r) return { ok: false, error: "房间不存在" };
     if (r.status === "cancelled") return { ok: false, error: "房间已被发起人取消" };
@@ -272,8 +300,8 @@ export async function apply(roomId: string, userId: string): Promise<ActionResul
         [roomId, userId],
       );
     }
-    return { ok: true };
-  });
+    // 带上发起人 id：事务提交后要给他发通知
+    return { ok: true, initiatorId: r.initiator_id };
 }
 
 /** 审批（仅发起人）。同意后若满员则锁死房间。 */
@@ -282,8 +310,41 @@ export async function decide(
   actorId: string,
   approve: boolean,
 ): Promise<ActionResult> {
-  return withTransaction(async (client) => {
-    const app = await client.query<{ room_id: string; applicant_id: string; status: ApplicationStatus }>(
+  const result = await withTransaction(async (client) => {
+    return decideTx(client, applicationId, actorId, approve);
+  });
+
+  if (!result.ok) return result;
+
+  // 通知在事务之后发。
+  // ⚠️ 这条比「有人申请」更重要：申请人不知道结果就会一直等。
+  const [slot, who] = await Promise.all([
+    roomSlot(result.roomId),
+    userName(result.actorId),
+  ]);
+  await notifyRoom({
+    roomId: result.roomId,
+    to: result.applicantId,
+    kind: "room.decided",
+    title: approve ? "你的约球申请已通过" : "你的约球申请未通过",
+    body: approve
+      ? "时间：" + slot
+      : "时间：" + slot + "\n发起人：" + who,
+    // 同一申请只会被处理一次（事务里已校验 status='pending'），不需要去重
+    dedupeKey: null,
+  });
+
+  return { ok: true };
+}
+
+/** 审批的事务部分：返回发通知所需的信息。 */
+async function decideTx(
+  client: PoolClient,
+  applicationId: string,
+  actorId: string,
+  approve: boolean,
+): Promise<{ ok: true; roomId: string; applicantId: string; actorId: string } | { ok: false; error: string }> {
+  const app = await client.query<{ room_id: string; applicant_id: string; status: ApplicationStatus }>(
       "SELECT room_id, applicant_id, status FROM room_applications WHERE id = $1 FOR UPDATE",
       [applicationId],
     );
@@ -317,8 +378,7 @@ export async function decide(
     );
 
     if (approve) await syncRoomStatus(client, a.room_id);
-    return { ok: true, roomId: a.room_id };
-  });
+    return { ok: true, roomId: a.room_id, applicantId: a.applicant_id, actorId };
 }
 
 /**
@@ -327,55 +387,165 @@ export async function decide(
  * 这是状态机里「full → open」的那条边：退出后必须重新可申请。
  */
 export async function withdraw(roomId: string, userId: string): Promise<ActionResult> {
-  return withTransaction(async (client) => {
-    const room = await client.query<{ initiator_id: string; status: RoomStatus }>(
-      "SELECT initiator_id, status FROM match_rooms WHERE id = $1 FOR UPDATE",
-      [roomId],
-    );
-    const r = room.rows[0];
-    if (!r) return { ok: false, error: "房间不存在" };
-    if (r.initiator_id === userId) return { ok: false, error: "发起人不能退出，请取消房间" };
-
-    const updated = await client.query(
-      `UPDATE room_applications SET status = 'withdrawn', decided_at = now()
-        WHERE room_id = $1 AND applicant_id = $2 AND status = 'approved'`,
-      [roomId, userId],
-    );
-    if ((updated.rowCount ?? 0) === 0) {
-      return { ok: false, error: "你不在这个房间里" };
-    }
-
-    // 退出即恢复空位：房间重新开放
-    await syncRoomStatus(client, roomId);
-    return { ok: true };
+  const result = await withTransaction(async (client) => {
+    return withdrawTx(client, roomId, userId);
   });
+
+  if (!result.ok) return result;
+
+  // 通知在事务之后发
+  const [slot, who] = await Promise.all([roomSlot(roomId), userName(userId)]);
+  await notifyRoom({
+    roomId,
+    to: result.initiatorId,
+    kind: "room.withdrawn",
+    title: who + " 退出了你的约球",
+    body: "时间：" + slot + "\n空位已恢复，其他人可以再申请。",
+    dedupeKey: null,
+  });
+
+  return { ok: true };
+}
+
+/** 退出的事务部分。 */
+async function withdrawTx(
+  client: PoolClient,
+  roomId: string,
+  userId: string,
+): Promise<{ ok: true; initiatorId: string } | { ok: false; error: string }> {
+  const room = await client.query<{ initiator_id: string; status: RoomStatus }>(
+    "SELECT initiator_id, status FROM match_rooms WHERE id = $1 FOR UPDATE",
+    [roomId],
+  );
+  const r = room.rows[0];
+  if (!r) return { ok: false, error: "房间不存在" };
+  if (r.initiator_id === userId) return { ok: false, error: "发起人不能退出，请取消房间" };
+
+  const updated = await client.query(
+    `UPDATE room_applications SET status = 'withdrawn', decided_at = now()
+      WHERE room_id = $1 AND applicant_id = $2 AND status = 'approved'`,
+    [roomId, userId],
+  );
+  if ((updated.rowCount ?? 0) === 0) {
+    return { ok: false, error: "你不在这个房间里" };
+  }
+
+  // 退出即恢复空位：房间重新开放
+  await syncRoomStatus(client, roomId);
+  return { ok: true, initiatorId: r.initiator_id };
 }
 
 /** 取消房间（仅发起人）。已加入者不受影响，房间从列表消失，无信誉影响（D-29）。 */
 export async function cancelRoom(roomId: string, userId: string): Promise<ActionResult> {
-  return withTransaction(async (client) => {
-    const room = await client.query<{ initiator_id: string; status: RoomStatus }>(
-      "SELECT initiator_id, status FROM match_rooms WHERE id = $1 FOR UPDATE",
-      [roomId],
-    );
-    const r = room.rows[0];
-    if (!r) return { ok: false, error: "房间不存在" };
-    if (r.initiator_id !== userId) return { ok: false, error: "只有发起人可以取消房间" };
-    if (r.status === "cancelled") return { ok: false, error: "房间已经取消了" };
-    if (r.status === "expired") return { ok: false, error: "房间已过期" };
+  // ⚠️ 名单必须在事务**之前**取：事务里会把 pending 申请置为 expired，
+  //    而 approved 的人正是要通知的对象。取早了不影响正确性，取晚了会漏。
+  const members = await approvedMemberIds(roomId);
+  const slot = await roomSlot(roomId);
 
-    await client.query(
-      "UPDATE match_rooms SET status = 'cancelled', cancelled_at = now() WHERE id = $1",
-      [roomId],
-    );
-    // 未处理的申请一并结束，避免留下永远等不到结果的 pending
-    await client.query(
-      `UPDATE room_applications SET status = 'expired', decided_at = now()
-        WHERE room_id = $1 AND status = 'pending'`,
-      [roomId],
-    );
-    return { ok: true };
+  const result = await withTransaction(async (client) => {
+    return cancelRoomTx(client, roomId, userId);
   });
+
+  if (!result.ok) return result;
+
+  // 通知所有已加入的成员（发起人自己不用通知自己）
+  await Promise.all(
+    members
+      .filter((id) => id !== userId)
+      .map((id) =>
+        notifyRoom({
+          roomId,
+          to: id,
+          kind: "room.cancelled",
+          title: "你参加的约球已被取消",
+          body: "时间：" + slot,
+          dedupeKey: null,
+        }),
+      ),
+  );
+
+  return { ok: true };
+}
+
+/** 取消房间的事务部分（仅发起人）。 */
+async function cancelRoomTx(
+  client: PoolClient,
+  roomId: string,
+  userId: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const room = await client.query<{ initiator_id: string; status: RoomStatus }>(
+    "SELECT initiator_id, status FROM match_rooms WHERE id = $1 FOR UPDATE",
+    [roomId],
+  );
+  const r = room.rows[0];
+  if (!r) return { ok: false, error: "房间不存在" };
+  if (r.initiator_id !== userId) return { ok: false, error: "只有发起人可以取消房间" };
+  if (r.status === "cancelled") return { ok: false, error: "房间已经取消了" };
+  if (r.status === "expired") return { ok: false, error: "房间已过期" };
+
+  await client.query(
+    "UPDATE match_rooms SET status = 'cancelled', cancelled_at = now() WHERE id = $1",
+    [roomId],
+  );
+  // 未处理的申请一并结束，避免留下永远等不到结果的 pending
+  await client.query(
+    `UPDATE room_applications SET status = 'expired', decided_at = now()
+      WHERE room_id = $1 AND status = 'pending'`,
+    [roomId],
+  );
+  return { ok: true };
+}
+
+/**
+ * 约球相关的通知辅助。
+ *
+ * ⚠️ 这些调用必须在**事务提交之后**发生。理由与审计模块一致：
+ *   通知失败绝不能回滚「申请/审批」这个业务动作 —— 那是本末倒置。
+ *   而且 notifications 表与业务表不同源，在事务里写会拉长持锁时间。
+ */
+async function notifyRoom(
+  input: {
+    roomId: string;
+    /** 收件人 */
+    to: string;
+    kind: Parameters<typeof notify>[0]["kind"];
+    title: string;
+    body?: string | null;
+    dedupeKey?: string | null;
+  },
+): Promise<void> {
+  await notify({
+    userId: input.to,
+    kind: input.kind,
+    title: input.title,
+    body: input.body,
+    link: `/rooms/${input.roomId}`,
+    dedupeKey: input.dedupeKey ?? null,
+  });
+}
+
+/** 取房间的时间段文案（通知里要写清是哪个约球）。 */
+async function roomSlot(roomId: string): Promise<string> {
+  const row = await queryOne<{ time_slot: string }>(
+    "SELECT time_slot FROM match_rooms WHERE id = $1",
+    [roomId],
+  );
+  return row?.time_slot ?? "某个约球";
+}
+
+/** 取用户姓名（通知里用姓名而不是「有人」，成员之间本来就互相可见姓名）。 */
+async function userName(userId: string): Promise<string> {
+  const row = await queryOne<{ name: string }>("SELECT name FROM users WHERE id = $1", [userId]);
+  return row?.name ?? "某位成员";
+}
+
+/** 取房间里所有已通过的人（用于「房间被取消」这类要通知全体的场景）。 */
+async function approvedMemberIds(roomId: string): Promise<string[]> {
+  const rows = await query<{ applicant_id: string }>(
+    "SELECT applicant_id FROM room_applications WHERE room_id = $1 AND status = 'approved'",
+    [roomId],
+  );
+  return rows.map((r) => r.applicant_id);
 }
 
 async function countApproved(

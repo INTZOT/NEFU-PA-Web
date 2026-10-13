@@ -10,6 +10,7 @@ import { BIO_MAX } from "@/modules/profile/service";
 import { Notice } from "@/components/Notice";
 import { SelfRatingSlider } from "@/components/SelfRatingSlider";
 import { MemberLink } from "@/components/MemberLink";
+import { unreadCount } from "@/modules/notification/service";
 
 const ROLE_LABEL: Record<string, string> = {
   member: "成员",
@@ -46,11 +47,13 @@ export default async function MePage({
 
   const season = await getActiveSeason();
 
-  const [invites, myEvents, rooms, bioRow] = await Promise.all([
+  const [invites, myEvents, rooms, bioRow, unread] = await Promise.all([
     listPendingForUser(user.id),
     listMyEvents(user.id),
     listMyRooms(user.id),
     queryOne<{ bio: string | null }>("SELECT bio FROM users WHERE id = $1", [user.id]),
+    // 消息入口的未读数（与导航栏红点同一个来源）
+    unreadCount(user.id),
   ]);
 
   // 本赛季积分、战绩与排名（D-22：比赛积分与自评分是两个独立的量）
@@ -182,6 +185,28 @@ export default async function MePage({
             <h1 className="text-xl font-bold">{user.name}</h1>
             <p className="mt-1 text-sm text-ink-muted">{ROLE_LABEL[user.role] ?? user.role}</p>
           </div>
+
+          {/*
+           * 消息入口放在个人主页里（而非导航栏单开一项）。
+           * 导航栏那个红点在名字旁，两者指向同一处 ——
+           * 头像名旁的星点负责「提醒」，这里负责「找到」。
+           */}
+          <Link
+            href="/notifications"
+            className={[
+              "flex shrink-0 items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm transition",
+              unread > 0
+                ? "border-danger/30 bg-danger-soft text-danger hover:border-danger/50"
+                : "border-line text-ink-muted hover:bg-surface-muted hover:text-ink",
+            ].join(" ")}
+          >
+            消息
+            {unread > 0 ? (
+              <span className="rounded-full bg-danger px-1.5 text-xs font-medium text-white">
+                {unread > 99 ? "99+" : unread}
+              </span>
+            ) : null}
+          </Link>
         </div>
 
         <dl className="mt-3 grid grid-cols-2 gap-y-2 text-sm">

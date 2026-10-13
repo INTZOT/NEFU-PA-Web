@@ -11,6 +11,7 @@
  */
 
 import { query, queryOne } from "@/lib/db";
+import { record as notify } from "@/modules/notification/service";
 
 export type Role = "member" | "admin" | "super_admin";
 
@@ -89,5 +90,24 @@ export async function setRole(
   }
 
   await query("UPDATE users SET role = $2 WHERE id = $1", [targetUserId, role]);
+
+  // 通知当事人。
+  //
+  // ⚠️ 只在角色**真的变了**时通知 —— 把 member 又设成 member 不该发通知。
+  // （target 是在改之前读的，所以这里比较的是变更前后的值。）
+  if (target.role !== role) {
+    await notify({
+      userId: targetUserId,
+      kind: "role.changed",
+      title: role === "admin" ? "你已被设为管理员" : "你的管理员权限已被取消",
+      body:
+        role === "admin"
+          ? "你现在可以管理公告、活动、相册与成员。"
+          : "你现在的身份是普通成员。",
+      link: "/me",
+      dedupeKey: null,
+    });
+  }
+
   return { ok: true };
 }

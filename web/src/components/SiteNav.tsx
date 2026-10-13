@@ -16,6 +16,13 @@ import { usePathname } from "next/navigation";
 export interface NavUser {
   name: string;
   isAdmin: boolean;
+  /**
+   * 未读消息数。
+   *
+   * 由服务端（layout）查好后传入 —— 本组件是纯展示的客户端组件，不做数据获取。
+   * 有未读时在名字旁亮红点，并把「我的」指向消息页。
+   */
+  unread: number;
 }
 
 interface NavItem {
@@ -116,11 +123,33 @@ export function SiteNav({ user }: { user: NavUser | null }) {
         {/* 账号区：固定在右侧，不参与滚动 */}
         <div className="flex shrink-0 items-center gap-1">
           {user ? (
-            <NavLink
-              href="/me"
-              label={user.name}
-              active={isActive(pathname, "/me")}
-            />
+            /*
+             * 有未读消息时，「我的」直接指向消息页 —— 这样红点与它的入口是同一个东西，
+             * 不做成一个只能看不能点的装饰。点掉未读后它会自然回到「我的」。
+             */
+            <Link
+              href={user.unread > 0 ? "/notifications" : "/me"}
+              aria-current={
+                isActive(pathname, "/me") || isActive(pathname, "/notifications")
+                  ? "page"
+                  : undefined
+              }
+              className={[
+                "relative rounded-lg px-2.5 py-1.5 whitespace-nowrap transition",
+                isActive(pathname, "/me") || isActive(pathname, "/notifications")
+                  ? "bg-brand-soft font-medium text-brand-ink"
+                  : "text-ink-muted hover:bg-surface-muted hover:text-ink",
+              ].join(" ")}
+            >
+              {user.name}
+              {user.unread > 0 ? (
+                <span
+                  aria-label={`${user.unread} 条未读消息`}
+                  title={`${user.unread} 条未读消息`}
+                  className="absolute -top-0.5 -right-0.5 h-2.5 w-2.5 rounded-full bg-danger ring-2 ring-surface"
+                />
+              ) : null}
+            </Link>
           ) : (
             <>
               <NavLink href="/login" label="登录" active={isActive(pathname, "/login")} />

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { getCurrentUser } from "@/lib/session";
 import { canEnterAdmin } from "@/lib/roles";
+import { unreadCount } from "@/modules/notification/service";
 import { SiteNav } from "@/components/SiteNav";
 import "./globals.css";
 
@@ -20,13 +21,19 @@ export const metadata: Metadata = {
 };
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
-  // 登录状态在服务端算好传给导航；导航本身只是个客户端展示组件
+  // 登录状态在服务端算好传给导航；导航本身只是个客户端展示组件。
+  // 未读数也在这里查 —— 导航每页都渲染，红点得跟着页面走。
   const user = await getCurrentUser();
+  const unread = user ? await unreadCount(user.id) : 0;
 
   return (
     <html lang="zh-CN" className="h-full antialiased">
       <body className="flex min-h-full flex-col bg-canvas text-ink">
-        <SiteNav user={user ? { name: user.name, isAdmin: canEnterAdmin(user) } : null} />
+        <SiteNav
+          user={
+            user ? { name: user.name, isAdmin: canEnterAdmin(user), unread } : null
+          }
+        />
 
         <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-6">{children}</main>
 
