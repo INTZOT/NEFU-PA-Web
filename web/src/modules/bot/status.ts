@@ -151,16 +151,35 @@ export async function getBotStatus(): Promise<BotStatus> {
     readQr(watchdog.activeService),
   ]);
 
+  // ⚠️ 「在等扫码」是最可靠的掉线信号，**不要只依赖看门狗**。
+  //
+  // 踩过的坑：看门狗靠日志特征判断登录态是否失效，而那些特征会随协议端版本/报错种类变化
+  // （曾按 `Heartbeat.Alive] Failed` 判断，后来 LLBot 实际报的是「签名服务网络超时 + 二维码过期」，
+  // 特征对不上 → sessionDead 一直是 false → 机器人在等扫码，面板却显示「运行中」）。
+  //
+  // 而「协议端刚写了新二维码」这件事本身就无可辩驳：**它在等人登录**。
+  // 这个信号由文件时间直接得出，不依赖任何日志文本。
+  const waitingForLogin = qr.qrFresh;
+
+  // ⚠️ 先算出「最终判定」，后面的字段**一律引用它**，不要各自去读 watchdog。
+  //
+  // 这里踩过坑：sessionDead 用了一个口径、qr 用了另一个口径，
+  // 结果面板显示「登录已失效」（正确）却拿不到二维码（因为 qr 那边仍按
+  // 「看门狗说没死」把码丢掉了）。两个字段口径不一致就会出现这种自相矛盾的状态。
+  const sessionDead = watchdog.sessionDead || waitingForLogin;
+  // 「真正在线」= 连接在 **且** 登录态有效。只看 connected 会掉进假在线的坑。
+  const trulyOnline = health.connected && !sessionDead;
+
   return {
     connected: health.connected,
     reachable: health.reachable,
     activeService: watchdog.activeService,
-    sessionDead: watchdog.sessionDead,
+    sessionDead,
     hasQr: qr.hasQr,
     qrFresh: qr.qrFresh,
     // 真正在线时不需要二维码 —— 不把它读进内存、也不返回给页面。
-    // 但「假在线」（sessionDead）时要给：那种状态下码正是恢复手段。
-    qr: health.connected && !watchdog.sessionDead ? null : qr.qr,
+    // 但「假在线」或「等登录」时要给：那种状态下码正是恢复手段。
+    qr: trulyOnline ? null : qr.qr,
     recoveryAttemptedAt: watchdog.attemptedAt,
     recoveryResult: watchdog.result,
   };

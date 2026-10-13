@@ -142,6 +142,36 @@ services:
   # 故改为以 LLBot 为主，NapCat 保留作为可随时回退的备选。
   #
   # 切换方式见 README「协议端」一节；两者的登录态各自持久化，回退只需重新启用。
+  #
+  # ---------- 有头模式：QQ 客户端容器（pmhq）----------
+  #
+  # LLBot 有两种连接方式（官方部署脚本原文）：
+  #   direct = 无头，纯代码复刻协议（省内存）
+  #   pmhq   = 有头，QQ 客户端跑在独立容器（**更稳**）
+  #
+  # 无头模式在本机实测会被反复作废会话，故改用有头。
+  # 登录态存在本容器自己的卷（qq_volume）里，**不在 llbot 的数据卷**。
+  pmhq:
+    image: linyuchen/pmhq:latest
+    # QQ 客户端需要较多内核能力（官方 compose 亦为 privileged: true）
+    privileged: true
+    restart: unless-stopped
+    profiles: [llbot]
+    environment:
+      # 账号登录由本容器负责；llbot 侧不再传 QQ 号
+      AUTO_LOGIN_QQ: ${BOT_QQ:-}
+      # 有头模式下签名 token 走环境变量（无头模式才读 data/auth_token.txt）
+      PMHQ_AUTH_TOKEN: ${LLBOT_AUTH_TOKEN:-}
+    volumes:
+      # QQ 客户端的登录态与配置
+      - qq_volume:/root/.config/QQ
+    networks: [backend]
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+
+  # ---------- 协议端：LLBot ----------
   llbot:
     # 本机拉取 Docker Hub / GitHub 均不稳定，镜像在本地构建后 docker save 传入
     image: nefu-pa-llbot:local
@@ -228,6 +258,7 @@ volumes:
   uploads_data: # 社团照片（D-31）
   napcat_cache: # NapCat 的二维码文件，供 web 只读读取
   llbot_data: # LLBot 的登录态与配置
+  qq_volume: # 有头模式下 QQ 客户端的登录态（属于 pmhq 容器）
   caddy_data:
   caddy_config:
   napcat_config:
