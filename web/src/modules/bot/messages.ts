@@ -111,7 +111,7 @@ export const BOT_MESSAGES: BotMessageDef[] = [
   {
     key: "bot.unknown",
     label: "不认识的消息",
-    hint: "用户发了机器人不认识的指令时。建议告诉他有哪些指令可用。",
+    hint: "用户发了机器人不认识的指令时。留空则不回复（静默）—— 想安静就清空这里。",
     maxLength: 300,
     required: [],
     fallback:

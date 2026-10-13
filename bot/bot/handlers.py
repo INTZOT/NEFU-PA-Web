@@ -63,7 +63,14 @@ async def handle_message(send, user_id: str, text: str) -> None:
         return
 
     # ---- 其他：给出可用指令 ----
-    await _reply(send, user_id, messages.message("bot.unknown"))
+    #
+    # 允许**静默**：管理后台把「无法识别」的文案留空，就什么都不回。
+    # 为什么要有这个开关：机器人是个账号，任何一条自动回复都是它的发言记录；
+    # 群聊里被随便一句话触发就会刷屏，且无意义的回复本身也增加被风控关注的可能。
+    # 留空即静默 —— 而不是删掉这个分支，这样仍可在后台改回一段提示。
+    hint = messages.message("bot.unknown")
+    if hint.strip():
+        await _reply(send, user_id, hint)
 
 
 async def _handle_register(send, user_id: str, user: dict | None) -> None:

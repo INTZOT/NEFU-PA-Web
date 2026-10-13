@@ -48,6 +48,15 @@ export interface BotStatus {
   reachable: boolean;
   /** 当前在用的协议端（napcat / llbot）。看门狗未上报时为 null。 */
   activeService: string | null;
+  /**
+   * 登录态是否已被服务端作废。
+   *
+   * ⚠️ 这一项与 connected **不是一回事**，必须分开看：
+   * LLBot 被作废会话后不会断开 WebSocket，只让心跳持续失败。
+   * 于是 connected 仍为 true、面板显示「运行中」，而实际上收不到任何消息。
+   * 这种「假在线」比明显掉线更危险，所以单独透出一项。
+   */
+  sessionDead: boolean;
   /** 二维码是否可读。 */
   hasQr: boolean;
   /** 二维码是否新鲜（新鲜才值得展示）。 */
@@ -104,20 +113,29 @@ async function readWatchdog(): Promise<{
   attemptedAt: number | null;
   result: string | null;
   activeService: string | null;
+  sessionDead: boolean;
 }> {
-  const empty = { attemptedAt: null, result: null, activeService: null };
+  const empty = {
+    attemptedAt: null,
+    result: null,
+    activeService: null,
+    sessionDead: false,
+  };
   try {
     const raw = await readFile(WATCHDOG_STATE_PATH, "utf8");
     const data = JSON.parse(raw) as {
       lastAttemptAt?: number;
       lastAttemptResult?: string;
       activeService?: string;
+      sessionDead?: boolean;
     };
     return {
       // 脚本写的是秒，这里转成毫秒以便直接给 Date 用
       attemptedAt: typeof data.lastAttemptAt === "number" ? data.lastAttemptAt * 1000 : null,
       result: typeof data.lastAttemptResult === "string" ? data.lastAttemptResult : null,
       activeService: typeof data.activeService === "string" ? data.activeService : null,
+      // 缺省为 false：读不到状态文件时不要凭空报「登录态失效」
+      sessionDead: data.sessionDead === true,
     };
   } catch {
     return empty;
@@ -137,10 +155,12 @@ export async function getBotStatus(): Promise<BotStatus> {
     connected: health.connected,
     reachable: health.reachable,
     activeService: watchdog.activeService,
+    sessionDead: watchdog.sessionDead,
     hasQr: qr.hasQr,
     qrFresh: qr.qrFresh,
-    // 已连接时不需要二维码 —— 不把它读进内存、也不返回给页面
-    qr: health.connected ? null : qr.qr,
+    // 真正在线时不需要二维码 —— 不把它读进内存、也不返回给页面。
+    // 但「假在线」（sessionDead）时要给：那种状态下码正是恢复手段。
+    qr: health.connected && !watchdog.sessionDead ? null : qr.qr,
     recoveryAttemptedAt: watchdog.attemptedAt,
     recoveryResult: watchdog.result,
   };

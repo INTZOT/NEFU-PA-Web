@@ -68,8 +68,27 @@ PROTOCOL_CANDIDATES = [
 #   扫码登录时也会周期性打印 Login Error（每次换码都有一条），
 #   把它当成被踢标志会在正常登录过程中触发重启 —— 反而制造不稳定。
 #
-# LLBot 的被踢措辞待实测补充（它底层是 LagrangeV2，用词可能不同）。
+# LLBot 的措辞已实测确认（见下）。
 KICK_MARKERS = ["KickedOffLine", "下线通知"]
+
+# 「登录态已失效」的特征 —— 两个协议端用词不同：
+#   NapCat: "登录态已失效" / "你的用户身份已失效"
+#   LLBot : "SSO Heartbeat.Alive failed" / "身份验证失败，请你重新登录"
+#
+# 为什么单独一类：这类状态下**服务端已作废会话，重启也没用**（凭据同样失效），
+# 必须人工扫码。把它与「被踢」区分开，可以让看门狗不去做无谓的重启，
+# 也让面板能如实告诉用户「需要你扫一下码」。
+SESSION_DEAD_MARKERS = [
+    "登录态已失效",
+    "用户身份已失效",
+    "Heartbeat.Alive] Failed",
+    "身份验证失败，请你重新登录",
+]
+
+# 判断「登录态已死」时回看的日志时间窗。
+# 取 5 分钟：协议端的心跳间隔是秒级/分钟级，5 分钟内没有心跳失败
+# 就应认为会话是活的；窗口太长会把早已恢复的旧失败也算进来。
+ALIVE_LOOKBACK = os.environ.get("WATCHDOG_ALIVE_LOOKBACK", "5m")
 
 # 冷却窗口：这段时间内不重复尝试自动重启。
 # 取 30 分钟 —— 足够覆盖「重启 → 快速登录 → 确认成功」的全过程。
@@ -117,6 +136,30 @@ def bot_connected() -> bool:
         return json.loads(res.stdout.strip()).get("connected") is True
     except Exception as exc:  # noqa: BLE001
         log(f"查询 bot 状态失败：{exc}")
+        return False
+
+
+def session_dead(container: str) -> bool:
+    """看近期日志里有没有「登录态已失效」的证据。
+
+    ⚠️ 这个判断是给**面板显示**用的，动机是一次真实踩坑：
+    LLBot 被服务端作废会话后**并不断开 WebSocket** —— 它继续上报 meta_event，
+    只是心跳一直失败。于是 bot 侧看到连接正常、面板显示「运行中」，
+    而实际上机器人已经收不到任何消息了。
+
+    这种「假在线」比明显掉线更危险，所以必须单独判断。
+    """
+    try:
+        res = subprocess.run(
+            [DOCKER, "logs", "--since", ALIVE_LOOKBACK, container],
+            capture_output=True,
+            text=True,
+            timeout=60,
+        )
+        text = res.stdout + res.stderr
+        return any(m in text for m in SESSION_DEAD_MARKERS)
+    except Exception as exc:  # noqa: BLE001
+        log(f"读取 {container} 日志失败：{exc}")
         return False
 
 
@@ -188,6 +231,12 @@ def main() -> int:
     current = active_protocol()
     state["activeService"] = current["service"] if current else None
 
+    # 另外记录「登录态是否还有效」——面板据此区分「真在线」与「假在线」。
+    # LLBot 被作废会话后不会断开 WebSocket，只看连接状态会误判为正常。
+    state["sessionDead"] = (
+        session_dead(current["container"]) if current else False
+    )
+
     if bot_connected():
         # 已连接：清掉「上次尝试」的痕迹，面板上就不会一直挂着告警
         if state.get("lastAttemptAt"):
@@ -196,7 +245,15 @@ def main() -> int:
             state.pop("lastAttemptResult", None)
         state.pop("lastSkipReason", None)
         write_state(state)
-        log(f"协议端已连接（当前为 {current['service'] if current else '未知'}），无需处理")
+        svc = current["service"] if current else "未知"
+        if state["sessionDead"]:
+            # 连接看着是好的，但登录态已失效 —— 必须点明，否则会误以为一切正常。
+            log(
+                f"⚠️ {svc} 连接看似正常，但登录态已失效（假在线）——"
+                "机器人实际收不到消息，需要人工扫码重新登录"
+            )
+        else:
+            log(f"协议端已连接（当前为 {svc}），无需处理")
         return 0
 
     log("协议端未连接")
@@ -207,6 +264,14 @@ def main() -> int:
     if proto is None:
         log("没有任何协议端容器在运行 —— 无法自动恢复，需人工处理")
         state["lastSkipReason"] = "no-protocol"
+        write_state(state)
+        return 0
+
+    if state["sessionDead"]:
+        # 登录态已被服务端作废，本地凭据一并失效 —— 重启恢复不了。
+        # 不做无谓重启，如实记录「需要人工扫码」，让人从面板上看到。
+        log(f"{proto['service']} 登录态已失效（需人工扫码），重启无用，本次不动")
+        state["lastSkipReason"] = "session-dead"
         write_state(state)
         return 0
 

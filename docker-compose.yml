@@ -66,8 +66,11 @@ services:
       # LLBot 的二维码路径（同样只读挂载）。两个协议端的码位置不同，
       # 面板按看门狗上报的 activeService 选择读哪一个。
       LLBOT_QR_PATH: /app/llbot-cache/temp/login-qrcode.png
-      # 看门狗的状态文件（只读）。面板据此显示「是否尝试过自动恢复」。
-      WATCHDOG_STATE_PATH: /app/watchdog-state/napcat-watchdog.json
+      # 看门狗的状态文件（只读）。面板据此显示「是否尝试过自动恢复」，
+      # 以及**当前在用的是哪个协议端**（决定去哪个路径找登录二维码）。
+      # 注意文件名与看门狗脚本里的一致 —— 改名过一次，这里曾忘记同步，
+      # 导致面板读的是旧文件、拿不到 activeService。
+      WATCHDOG_STATE_PATH: /app/watchdog-state/protocol-watchdog.json
     volumes:
       # 社团照片（D-31）：命名卷，与数据库同级别的持久化。
       # 为什么不放 web/public：那是构建进镜像的，下次部署照片会全部消失。
@@ -136,6 +139,19 @@ services:
   llbot:
     # 本机拉取 Docker Hub / GitHub 均不稳定，镜像在本地构建后 docker save 传入
     image: nefu-pa-llbot:local
+    # 启动前把卷里的配置恢复到镜像内的 default_config.json。
+    #
+    # 为什么需要：LLBot 把运行期配置写在镜像层的 /app/llbot/default_config.json，
+    # 那个文件能扛 restart、但**扛不住镜像重建**。这里在每次启动时从卷恢复，
+    # 使「改了配置 → 重建镜像」也不会丢。
+    entrypoint:
+      - sh
+      - -c
+      - |
+        if [ -f /app/llbot/data/config.json ]; then
+          cp /app/llbot/data/config.json /app/llbot/default_config.json
+        fi
+        exec /startup.sh
     restart: unless-stopped
     profiles: [llbot]
     environment:
@@ -152,6 +168,8 @@ services:
       - "127.0.0.1:3081:3081"
     volumes:
       # 登录态与配置（首次仍需扫码，之后靠 AUTO_LOGIN_QQ 免扫）
+      # 注意：运行期配置 default_config.json 位于 /app/llbot/（镜像层），
+      # 它的持久化由 entrypoint 负责从本卷恢复/回写（见 README「协议端」一节）。
       - llbot_data:/app/llbot/data
     logging:
       driver: json-file

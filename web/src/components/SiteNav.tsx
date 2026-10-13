@@ -81,7 +81,7 @@ export function SiteNav({ user }: { user: NavUser | null }) {
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/logo-96.png" alt="" width={28} height={28} className="h-7 w-7" />
-          <span className="font-bold tracking-tight text-ink">匹克球协会</span>
+          <span className="font-bold tracking-tight text-ink">东林匹克网</span>
         </Link>
 
         {/* 主导航：窄屏可横向滚动 */}
