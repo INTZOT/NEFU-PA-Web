@@ -23,19 +23,41 @@ export default async function NewRoomPage({
 
       <div className="rounded-xl border border-line bg-surface p-4">
         <form action="/api/rooms" method="post" className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium" htmlFor="timeSlot">
-              时间段
-            </label>
-            <input
-              id="timeSlot"
-              name="timeSlot"
-              required
-              maxLength={60}
-              placeholder="如：周三 18:00–20:00"
-              className="mt-1 w-full rounded border border-line-strong px-3 py-2 outline-none focus:border-brand"
-            />
+          {/*
+           * 时间用真实日期时间选择，不再是自由文本。
+           *
+           * 这样过期时间才能按「活动结束后」算 —— 原来从发布时刻起算 24 小时，
+           * 想组织下周的活动就非得等到临近才能发（D-44）。
+           */}
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div>
+              <label className="block text-sm font-medium" htmlFor="startAt">
+                开始时间
+              </label>
+              <input
+                id="startAt"
+                name="startAt"
+                type="datetime-local"
+                required
+                className="mt-1 w-full rounded border border-line-strong px-3 py-2 outline-none focus:border-brand"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium" htmlFor="endAt">
+                结束时间（可选）
+              </label>
+              <input
+                id="endAt"
+                name="endAt"
+                type="datetime-local"
+                className="mt-1 w-full rounded border border-line-strong px-3 py-2 outline-none focus:border-brand"
+              />
+            </div>
           </div>
+          <p className="text-xs text-ink-muted">
+            不填结束时间也可以（打到几点常说不准）。房间会在活动结束后自动下架。
+          </p>
 
           <div>
             <label className="block text-sm font-medium" htmlFor="capacity">

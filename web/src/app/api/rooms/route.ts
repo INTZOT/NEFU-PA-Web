@@ -8,7 +8,8 @@ export async function POST(request: Request) {
 
   const form = await request.formData();
   const parsed = parseRoomInput({
-    timeSlot: String(form.get("timeSlot") ?? ""),
+    startAt: String(form.get("startAt") ?? ""),
+    endAt: String(form.get("endAt") ?? ""),
     capacity: String(form.get("capacity") ?? ""),
     note: String(form.get("note") ?? ""),
   });

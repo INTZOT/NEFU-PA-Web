@@ -4,7 +4,7 @@ import { getCurrentUser } from "@/lib/session";
 import { query, queryOne } from "@/lib/db";
 import { listPendingForUser } from "@/modules/event/pairing";
 import { listMine as listMyEvents } from "@/modules/event/service";
-import { listMine as listMyRooms } from "@/modules/room/service";
+import { formatRoomTime, listMine as listMyRooms } from "@/modules/room/service";
 import { getActiveSeason, getMyRank, getHidden } from "@/modules/rating/leaderboard";
 import { BIO_MAX } from "@/modules/profile/service";
 import { Notice } from "@/components/Notice";
@@ -170,7 +170,7 @@ export default async function MePage({
               </p>
               <p className="mt-1 text-xs">
                 <Link href={`/rooms/${r.id}`} className="text-brand hover:underline">
-                  {r.timeSlot} · 去处理 →
+                  {formatRoomTime(r.startAt, r.endAt)} · 去处理 →
                 </Link>
               </p>
             </div>

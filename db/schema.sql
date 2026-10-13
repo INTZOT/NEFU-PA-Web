@@ -213,17 +213,22 @@ CREATE INDEX IF NOT EXISTS rating_ticks_user_idx ON rating_ticks(user_id, season
 CREATE TABLE IF NOT EXISTS match_rooms (
   id           uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   initiator_id uuid        NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  time_slot    text        NOT NULL,
+  -- 活动时间。用真实时间戳而非文本（D-44）：
+  -- 过期时间要按「活动结束后」算，文本无法可靠解析成日期。
+  start_at     timestamptz NOT NULL,
+  end_at       timestamptz,                 -- 选填：打到几点常说不准
   capacity     integer     NOT NULL,
   note         text,
   status       text        NOT NULL DEFAULT 'open',
   created_at   timestamptz NOT NULL DEFAULT now(),
+  -- 由应用层按 start_at/end_at 计算：结束后 2 小时（无结束时间则开始后 4 小时）
   expires_at   timestamptz NOT NULL,
   cancelled_at timestamptz,
   CONSTRAINT match_rooms_status_chk   CHECK (status IN ('open','full','cancelled','expired')),
-  CONSTRAINT match_rooms_capacity_chk CHECK (capacity > 0)
+  CONSTRAINT match_rooms_capacity_chk CHECK (capacity > 0),
+  CONSTRAINT match_rooms_time_chk     CHECK (end_at IS NULL OR end_at > start_at)
 );
-CREATE INDEX IF NOT EXISTS match_rooms_lobby_idx ON match_rooms(status, created_at DESC);
+CREATE INDEX IF NOT EXISTS match_rooms_lobby_idx ON match_rooms(status, start_at ASC);
 
 -- ---------- 16. 约球申请 ----------
 CREATE TABLE IF NOT EXISTS room_applications (

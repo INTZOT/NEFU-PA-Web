@@ -57,6 +57,12 @@ services:
       SHARED_RULES_TOKEN: ${SHARED_RULES_TOKEN:?请在 .env 中设置 SHARED_RULES_TOKEN}
       # 超管初始化用（D-23：预先指定）
       SUPER_ADMIN_QQ: ${SUPER_ADMIN_QQ:-}
+      # ⚠️ 时区。**不能省** —— 容器默认是 UTC，而宿主机与所有成员都在东八区。
+      #
+      # 漏掉它的后果很隐蔽：`new Date("2026-10-20T15:00")`（datetime-local 的值，
+      # 没有时区后缀）会被当成 UTC 解析，于是成员填「15:00」实际存成了「23:00」，
+      # 页面再显示出来又是 15:00 —— 表单看着对，数据库里全错 8 小时。
+      TZ: Asia/Shanghai
       # 社团照片的存放目录（D-31）。必须挂载卷，否则照片会随着镜像更新丢失。
       UPLOAD_DIR: /app/uploads
       # 机器人健康检查地址：用于管理面板显示「机器人是否在线」。

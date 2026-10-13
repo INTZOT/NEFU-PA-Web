@@ -22,7 +22,29 @@ import type { PoolClient } from "pg";
 import { query, queryOne, withTransaction } from "@/lib/db";
 import { record as notify } from "@/modules/notification/service";
 
-export const ROOM_TTL_HOURS = 24;
+/**
+ * 活动结束后多久房间过期。
+ *
+ * 代 24 小时的「发布后固定过期」—— 那样想组织「下周六打球」就非得等到周五才能发，
+ * 否则帖子第二天就消失了（详见 D-44）。
+ */
+const EXPIRE_AFTER_END_HOURS = 2;
+
+/** 没填结束时间时的兜底：按开始后 4 小时算（够一场球打完）。 */
+const EXPIRE_AFTER_START_HOURS = 4;
+
+/**
+ * 把「datetime-local」输入（如 `2026-10-13T15:00`）解析成 Date。
+ *
+ * ⚠️ 不加 'Z'，让它按**服务器本地时区**解析 —— 服务器时区是 Asia/Shanghai，
+ * 与成员所在时区一致。若解析成 UTC 会导致所有时间偏移 8 小时。
+ */
+function parseLocalDateTime(value: string): Date | null {
+  const t = value.trim();
+  if (!t) return null;
+  const d = new Date(t);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
 
 export type RoomStatus = "open" | "full" | "cancelled" | "expired";
 export type ApplicationStatus = "pending" | "approved" | "rejected" | "withdrawn" | "expired";
@@ -31,7 +53,10 @@ export interface Room {
   id: string;
   initiatorId: string;
   initiatorName: string;
-  timeSlot: string;
+  /** 开始时间（ISO 字符串）。 */
+  startAt: string;
+  /** 结束时间（ISO 字符串），未填则为 null。 */
+  endAt: string | null;
   capacity: number;
   note: string | null;
   status: RoomStatus;
@@ -53,7 +78,8 @@ interface RoomRow {
   id: string;
   initiator_id: string;
   initiator_name: string;
-  time_slot: string;
+  start_at: string;
+  end_at: string | null;
   capacity: number;
   note: string | null;
   status: RoomStatus;
@@ -68,7 +94,8 @@ function toRoom(r: RoomRow): Room {
     id: r.id,
     initiatorId: r.initiator_id,
     initiatorName: r.initiator_name,
-    timeSlot: r.time_slot,
+    startAt: r.start_at,
+    endAt: r.end_at,
     capacity: r.capacity,
     note: r.note,
     status: r.status,
@@ -105,8 +132,8 @@ export async function expireDue(): Promise<void> {
 }
 
 const ROOM_SELECT = `
-  SELECT r.id, r.initiator_id, i.name AS initiator_name, r.time_slot, r.capacity,
-         r.note, r.status, r.created_at, r.expires_at,
+  SELECT r.id, r.initiator_id, i.name AS initiator_name, r.start_at, r.end_at,
+         r.capacity, r.note, r.status, r.created_at, r.expires_at,
          (SELECT count(*)::text FROM room_applications a
            WHERE a.room_id = r.id AND a.status = 'approved') AS member_count,
          (SELECT count(*)::text FROM room_applications a
@@ -118,8 +145,10 @@ const ROOM_SELECT = `
 /** 大厅列表：招募中与已满的（已取消/已过期的不展示）。 */
 export async function listActive(): Promise<Room[]> {
   await expireDue();
+  // 按「活动开始时间」升序：最近要打的排最前，这才是成员关心的顺序。
+  // （原来按创建时间倒序，会让早先发布但时间更晚的排前面。）
   const rows = await query<RoomRow>(
-    `${ROOM_SELECT} WHERE r.status IN ('open','full') ORDER BY r.created_at DESC`,
+    `${ROOM_SELECT} WHERE r.status IN ('open','full') ORDER BY r.start_at ASC`,
   );
   return rows.map(toRoom);
 }
@@ -150,6 +179,39 @@ export async function listMine(userId: string): Promise<{
     ),
   ]);
   return { initiated: initiated.map(toRoom), joined: joined.map(toRoom) };
+}
+
+/**
+ * 把时间范围渲染成给成员看的文案。
+ *
+ * 例：`今天 15:00-17:00`、`明天 20:30 开始`、`10月18日 周六 14:00-16:00`。
+ *
+ * 相对日期（今天/明天）比「10月13日」更好用 —— 成员关心的是「还有多久」。
+ */
+export function formatRoomTime(startAt: string, endAt: string | null): string {
+  const start = new Date(startAt);
+  const end = endAt ? new Date(endAt) : null;
+
+  const pad = (n: number) => String(n).padStart(2, "0");
+  const hhmm = (d: Date) => `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+
+  // 按「本地日历天」求差，不能用毫秒差 —— 否则今晚 23:00 到明早 01:00 会被算成同一天。
+  const dayStart = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+  const dayDiff = Math.round((dayStart(start) - dayStart(new Date())) / 86400000);
+
+  let prefix: string;
+  if (dayDiff === 0) prefix = "今天";
+  else if (dayDiff === 1) prefix = "明天";
+  else if (dayDiff === -1) prefix = "昨天";
+  else if (dayDiff > 1 && dayDiff < 7) {
+    prefix = ["周日", "周一", "周二", "周三", "周四", "周五", "周六"][start.getDay()];
+  } else {
+    prefix = `${start.getMonth() + 1}月${start.getDate()}日`;
+  }
+
+  return end
+    ? `${prefix} ${hhmm(start)}-${hhmm(end)}`
+    : `${prefix} ${hhmm(start)} 开始`;
 }
 
 // ---------------------------------------------------------------------------
@@ -184,7 +246,8 @@ async function syncRoomStatus(
 // ---------------------------------------------------------------------------
 
 export interface RoomInput {
-  timeSlot: string;
+  startAt: Date;
+  endAt: Date | null;
   capacity: number;
   note: string | null;
 }
@@ -194,13 +257,31 @@ export type ParseRoomResult =
   | { ok: false; error: string };
 
 export function parseRoomInput(form: {
-  timeSlot: string;
+  startAt: string;
+  endAt: string;
   capacity: string;
   note: string;
 }): ParseRoomResult {
-  const timeSlot = form.timeSlot.trim();
-  if (!timeSlot) return { ok: false, error: "请填写时间段" };
-  if (timeSlot.length > 60) return { ok: false, error: "时间段过长（最多 60 字）" };
+  const startAt = parseLocalDateTime(form.startAt);
+  if (!startAt) return { ok: false, error: "请填写活动开始时间" };
+
+  // 结束时间是选填的：大多数约球说不准打到几点。
+  // 但**填了就必须晚于开始**，否则是明显的输入错误。
+  const endRaw = form.endAt.trim();
+  let endAt: Date | null = null;
+  if (endRaw) {
+    endAt = parseLocalDateTime(endRaw);
+    if (!endAt) return { ok: false, error: "结束时间格式不正确" };
+    if (endAt.getTime() <= startAt.getTime()) {
+      return { ok: false, error: "结束时间必须晚于开始时间" };
+    }
+  }
+
+  // 已经过去的活动没必要发布 —— 发出来立刻就是过期状态，只会让人困惑。
+  // 给 5 分钟宽限，避免「差一分钟」被拒。
+  if (startAt.getTime() < Date.now() - 5 * 60 * 1000) {
+    return { ok: false, error: "开始时间不能是过去的时间" };
+  }
 
   const capacity = Number(form.capacity);
   if (!Number.isInteger(capacity) || capacity < 2) {
@@ -211,15 +292,27 @@ export function parseRoomInput(form: {
   const note = form.note.trim();
   if (note.length > 200) return { ok: false, error: "备注过长（最多 200 字）" };
 
-  return { ok: true, value: { timeSlot, capacity, note: note || null } };
+  return { ok: true, value: { startAt, endAt, capacity, note: note || null } };
 }
 
 export async function createRoom(input: RoomInput, initiatorId: string): Promise<string> {
+  // 过期时间 = 活动结束后 2 小时（没填结束时间则按开始后 4 小时）。
+  // 这意味着「时间已过的活动」会自然下架，不需要额外清理。
   const row = await queryOne<{ id: string }>(
-    `INSERT INTO match_rooms (initiator_id, time_slot, capacity, note, expires_at)
-     VALUES ($1, $2, $3, $4, now() + ($5 || ' hours')::interval)
+    `INSERT INTO match_rooms (initiator_id, start_at, end_at, capacity, note, expires_at)
+     VALUES ($1, $2, $3, $4, $5,
+             COALESCE($3::timestamptz + ($6 || ' hours')::interval,
+                      $2::timestamptz + ($7 || ' hours')::interval))
      RETURNING id`,
-    [initiatorId, input.timeSlot, input.capacity, input.note, String(ROOM_TTL_HOURS)],
+    [
+      initiatorId,
+      input.startAt.toISOString(),
+      input.endAt ? input.endAt.toISOString() : null,
+      input.capacity,
+      input.note,
+      String(EXPIRE_AFTER_END_HOURS),
+      String(EXPIRE_AFTER_START_HOURS),
+    ],
   );
   if (!row) throw new Error("创建约球房间失败");
   return row.id;

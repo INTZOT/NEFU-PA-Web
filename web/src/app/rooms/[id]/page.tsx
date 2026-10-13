@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/session";
-import { getById, getRoomDetail, ROOM_TTL_HOURS } from "@/modules/room/service";
+import { formatRoomTime, getById, getRoomDetail } from "@/modules/room/service";
 import { Notice } from "@/components/Notice";
 import { MemberLink } from "@/components/MemberLink";
 
@@ -57,14 +57,16 @@ export default async function RoomDetailPage({
             {STATUS_LABEL[room.status] ?? room.status}
           </span>
         </div>
-        <h1 className="mt-2 text-xl font-bold">{room.timeSlot}</h1>
+        <h1 className="mt-2 text-xl font-bold">
+          {formatRoomTime(room.startAt, room.endAt)}
+        </h1>
         <p className="mt-2 text-sm text-ink-muted">
           发起人 <MemberLink userId={room.initiatorId} name={room.initiatorName} /> · 已加入{" "}
           {room.capacity - room.seatsLeft}/{room.capacity}
           {room.seatsLeft > 0 ? `（还差 ${room.seatsLeft} 人）` : ""}
         </p>
         <p className="mt-1 text-xs text-ink-subtle">
-          发起后 {ROOM_TTL_HOURS} 小时内有效
+          活动结束后自动下架
         </p>
         {room.note ? (
           <p className="mt-3 text-sm whitespace-pre-wrap text-ink">{room.note}</p>

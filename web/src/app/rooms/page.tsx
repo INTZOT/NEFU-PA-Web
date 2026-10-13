@@ -1,17 +1,24 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/session";
-import { listActive } from "@/modules/room/service";
+import { formatRoomTime, listActive } from "@/modules/room/service";
 import { MemberLink } from "@/components/MemberLink";
 
 export const metadata = { title: "约球大厅" };
 
-function remaining(expiresAt: string): string {
-  const ms = new Date(expiresAt).getTime() - Date.now();
-  if (ms <= 0) return "已过期";
+/**
+ * 还要多久开始。
+ *
+ * 注意这里显示的是「距活动开始」而不是「距过期」——
+ * 过期时间现在等于活动结束（D-44），成员关心的是「还有多久开打」。
+ */
+function untilStart(startAt: string): string {
+  const ms = new Date(startAt).getTime() - Date.now();
+  if (ms <= 0) return "进行中";
   const hours = Math.floor(ms / 3600_000);
-  if (hours >= 1) return `剩 ${hours} 小时`;
-  return `剩 ${Math.max(1, Math.floor(ms / 60_000))} 分钟`;
+  if (hours >= 24) return `${Math.floor(hours / 24)} 天后`;
+  if (hours >= 1) return `${hours} 小时后`;
+  return `${Math.max(1, Math.floor(ms / 60_000))} 分钟后`;
 }
 
 export default async function RoomsPage({
@@ -67,7 +74,7 @@ export default async function RoomsPage({
                   {room.status === "full" ? "已满" : "招募中"}
                 </span>
                 <Link href={`/rooms/${room.id}`} className="font-semibold hover:underline">
-                  {room.timeSlot}
+                  {formatRoomTime(room.startAt, room.endAt)}
                 </Link>
               </div>
               <p className="mt-1 text-sm text-ink-muted">
@@ -76,7 +83,7 @@ export default async function RoomsPage({
                 {room.seatsLeft > 0 ? `（还差 ${room.seatsLeft} 人）` : ""}
                 {room.pendingCount > 0 ? ` · 待处理 ${room.pendingCount}` : ""}
                 {" · "}
-                {remaining(room.expiresAt)}
+                {untilStart(room.startAt)}
               </p>
               {room.note ? (
                 <p className="mt-1 text-sm whitespace-pre-wrap text-ink-muted">{room.note}</p>

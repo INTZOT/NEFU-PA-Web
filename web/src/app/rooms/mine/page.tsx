@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/session";
-import { listMine } from "@/modules/room/service";
+import { formatRoomTime, listMine } from "@/modules/room/service";
 import { Notice } from "@/components/Notice";
 
 const STATUS_LABEL: Record<string, string> = {
@@ -32,7 +32,7 @@ export default async function MyRoomsPage({
               {STATUS_LABEL[r.status] ?? r.status}
             </span>
             <Link href={`/rooms/${r.id}`} className="font-medium hover:underline">
-              {r.timeSlot}
+              {formatRoomTime(r.startAt, r.endAt)}
             </Link>
             {r.pendingCount > 0 ? (
               <span className="rounded bg-amber-100 px-2 py-0.5 text-xs text-amber-800">
