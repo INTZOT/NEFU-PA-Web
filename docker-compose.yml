@@ -143,33 +143,27 @@ services:
   #
   # 切换方式见 README「协议端」一节；两者的登录态各自持久化，回退只需重新启用。
   #
-  # ---------- 有头模式：QQ 客户端容器（pmhq）----------
+  # ---------- 关于「有头模式」（已弃用，保留此说明以免重蹈覆辙）----------
   #
   # LLBot 有两种连接方式（官方部署脚本原文）：
   #   direct = 无头，纯代码复刻协议（省内存）
-  #   pmhq   = 有头，QQ 客户端跑在独立容器（**更稳**）
+  #   pmhq   = 有头，QQ 客户端跑在独立容器（官方称「更稳」）
   #
-  # 无头模式在本机实测会被反复作废会话，故改用有头。
-  # 登录态存在本容器自己的卷（qq_volume）里，**不在 llbot 的数据卷**。
-  pmhq:
-    image: linyuchen/pmhq:latest
-    # QQ 客户端需要较多内核能力（官方 compose 亦为 privileged: true）
-    privileged: true
-    restart: unless-stopped
-    profiles: [llbot]
-    environment:
-      # 账号登录由本容器负责；llbot 侧不再传 QQ 号
-      AUTO_LOGIN_QQ: ${BOT_QQ:-}
-      # 有头模式下签名 token 走环境变量（无头模式才读 data/auth_token.txt）
-      PMHQ_AUTH_TOKEN: ${LLBOT_AUTH_TOKEN:-}
-    volumes:
-      # QQ 客户端的登录态与配置
-      - qq_volume:/root/.config/QQ
-    networks: [backend]
-    logging:
-      driver: json-file
-      options:
-        max-size: "10m"
+  # 我们**试过有头模式并放弃**，原因与结论：
+  #
+  #   1. 官方确实说它更稳，但代价是在容器里跑 **Electron + 完整 QQ 客户端**。
+  #   2. 本机只有 1.6GB 内存 / 2 vCPU。实测：
+  #        - pmhq 单独运行：内存稳定在 265~340MB，看似没问题；
+  #        - **pmhq + llbot 同时运行：约 2 分钟内整台服务器失联**
+  #          （load average 冲到 22.8，SSH 与网站全部超时，只能强制重启）。
+  #   3. 结论：这台机器的资源撑不住有头模式。要用它需先加内存。
+  #
+  # 踩坑记录：**单独测 pmhq 给了虚假的安心感** —— 组合未验证就下了「能承受」的
+  # 结论，结果第二次直接崩掉服务器。教训：资源评估必须测**峰值组合**，不是单个组件。
+  #
+  # 如将来要重新启用：恢复 pmhq 服务定义（镜像 linyuchen/pmhq，privileged，
+  # qq_volume:/root/.config/QQ，PMHQ_AUTH_TOKEN），并让 llbot 设
+  # PROTOCOL_MODE=pmhq / PMHQ_HOST=pmhq / PMHQ_PORT=13000。
 
   # ---------- 协议端：LLBot ----------
   llbot:
@@ -191,10 +185,10 @@ services:
     restart: unless-stopped
     profiles: [llbot]
     environment:
-      # ⚠️ 这一项决定「重启后要不要重新扫码」。
+      # ⚠️ 无头模式（direct）：纯代码复刻协议，不跑 QQ 客户端。
       #
-      # LLBot 的 startup.sh 逻辑：设了 AUTO_LOGIN_QQ 就执行
-      #   node ./llbot.js -q <QQ号>    # 快速登录
+      # 设了 AUTO_LOGIN_QQ 后 startup.sh 执行：
+      #   node ./llbot.js -q <QQ号>    # 首次仍需扫码，之后免扫
       # 且**每次启动都会传** —— 不像 NapCat 那样在内部重启后丢掉该参数。
       AUTO_LOGIN_QQ: ${BOT_QQ:-}
       # WebUI 端口。LLBot 默认 3080，与本机 DSH 网页界面冲突，故改到 3081。
@@ -258,7 +252,6 @@ volumes:
   uploads_data: # 社团照片（D-31）
   napcat_cache: # NapCat 的二维码文件，供 web 只读读取
   llbot_data: # LLBot 的登录态与配置
-  qq_volume: # 有头模式下 QQ 客户端的登录态（属于 pmhq 容器）
   caddy_data:
   caddy_config:
   napcat_config:
