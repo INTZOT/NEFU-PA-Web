@@ -13,7 +13,7 @@ import { getBotStatus } from "@/modules/bot/status";
  * 相比曾经用过的临时公开路由 /qr（任何人访问都能抢登），这里必须登录且必须是超管。
  *
  * 缓存：必须 no-store。浏览器缓存旧二维码会让人扫到一个已失效的码，
- * 而二维码本身的内容是变的（NapCat 约每 2 分钟换一次）。
+ * 而二维码本身的内容是变的（协议端约每 2 分钟换一次）。
  */
 export async function GET() {
   const user = await getCurrentUser();
@@ -22,8 +22,14 @@ export async function GET() {
 
   const status = await getBotStatus();
 
-  // 已连接时没有二维码可言（NapCat 不会生成）
-  if (status.connected || !status.qr) {
+  // 「真正在线」时没有二维码可言（协议端不会生成）。
+  //
+  // ⚠️ 判断条件必须与 status.ts 里的一致 —— 不能只看 connected：
+  // LLBot 被作废会话后会保持 WebSocket 连接（假在线），此时 connected 为 true，
+  // 但二维码恰恰是恢复手段，必须给出。这里曾漏掉 sessionDead，
+  // 导致假在线时既显示「登录已失效」又拿不到码。
+  const trulyOnline = status.connected && !status.sessionDead;
+  if (trulyOnline || !status.qr) {
     return new NextResponse("No QR available", {
       status: 404,
       headers: { "cache-control": "no-store" },

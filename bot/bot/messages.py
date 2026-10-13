@@ -66,8 +66,15 @@ def _fetch() -> dict[str, str] | None:
                 continue
             key = item.get("key")
             template = item.get("template")
-            if isinstance(key, str) and isinstance(template, str) and template:
+            # ⚠️ 空字符串是**有意义的取值**，不能当「没取到」丢掉。
+            #
+            # 管理员把某条文案留空 = 明确表示「这条不要回复」（目前用于
+            # bot.unknown 静默）。这里曾写成 `and template`，于是空值被丢弃、
+            # 回退到内置默认文案，静默功能直接失效 —— 而且表面上「设置成功」，
+            # 排查时很容易被误导。
+            if isinstance(key, str) and isinstance(template, str):
                 out[key] = template
+        # 只有一条都没拿到才算失败；拿到空值也算成功。
         return out or None
     except Exception as exc:  # noqa: BLE001
         log.warning("获取机器人文案失败，将使用内置兜底：%s", exc)
@@ -100,7 +107,19 @@ def message(key: str, **values: object) -> str:
     未知的占位符会被原样保留 —— 不静默删掉，
     这样文案写错时能一眼看出来，而不是丢失信息。
     """
-    template = _templates().get(key) or _FALLBACKS.get(key) or ""
+    # ⚠️ 必须按「键是否存在」判断，**不能**用 `or` 链。
+    #
+    # 空字符串是有意义的取值（管理员把该文案留空 = 这条不要回复），
+    # 而空串在 Python 里是假值 —— 用 `x or y` 会让它一路回退到内置默认文案，
+    # 「留空即静默」就永远不生效。
+    #
+    # 这个坑在本文件里出现过三次（_fetch 的过滤、这里的取值），
+    # 每次表面上都「保存成功」，排查代价很大 —— 所以这里显式区分「键不存在」与「值为空」。
+    templates = _templates()
+    if key in templates:
+        template = templates[key]
+    else:
+        template = _FALLBACKS.get(key, "")
 
     site_url = os.environ.get("SITE_URL", "").rstrip("/")
     context: dict[str, object] = {"url": site_url, **values}

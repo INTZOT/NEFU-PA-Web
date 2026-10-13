@@ -17,6 +17,9 @@ export const SETTING_DEFS = [
     label: "首页大标题",
     maxLength: 40,
     multiline: false,
+    // 首页文案不允许空 —— 空了页面会很难看。
+    // （机器人文案则相反：空值表示「这条不回复」，见 modules/bot/messages.ts）
+    validate: (v: string) => (v.trim() ? null : "不能为空"),
     fallback: "东北林业大学匹克球协会",
   },
   {
@@ -24,6 +27,7 @@ export const SETTING_DEFS = [
     label: "首页副标题",
     maxLength: 200,
     multiline: true,
+    validate: (v: string) => (v.trim() ? null : "不能为空"),
     fallback:
       "欢迎加入匹克球协会。这里发布社团公告与活动信息；成员登录后可使用约球大厅、活动报名与积分排行。",
   },
@@ -42,14 +46,17 @@ export interface SettingValue {
 /**
  * 读一项配置。
  *
- * **取不到时返回 fallback 而不是空串**：配置表尚为空（或管理员清空过）时，
- * 页面仍应显示原本的文案，不能变成空白。
- */
-/**
- * 读一项配置。
+ * **行不存在时**返回 fallback（配置表尚为空 / 该键从未写过）。
  *
- * **取不到时返回 fallback 而不是空串**：配置表尚为空（或管理员清空过）时，
- * 页面仍应显示原本的文案，不能变成空白。
+ * ⚠️ 但**行存在就用它的值，哪怕是空串** —— 空值是有意义的取值。
+ *
+ * 这里曾经写成 `value ? value : fallback`，把「设为空」与「没设过」等同起来。
+ * 后果：机器人文案 `bot.unknown` 被管理员清空后，取出来又变回默认文案，
+ * 「留空即静默」永远不生效 —— 而且后台显示已保存、数据库里确实是空串，
+ * 极难排查（实际踩过）。
+ *
+ * 原来那条「防止页面文案变空白」的意图，改由**写入侧的非空校验**保证
+ * （见 modules/setting/save.ts 与各 def 的 validate），前提是首页文案为空会让页面难看。
  *
  * `explicitFallback` 供**不在 SETTING_DEFS 里**的键使用
  * （如机器人文案，其定义在 modules/bot/messages.ts）。
@@ -63,8 +70,8 @@ export async function getValue(
     "SELECT value FROM site_settings WHERE key = $1",
     [key],
   );
-  const value = row?.value?.trim();
-  return value ? value : (def?.fallback ?? explicitFallback ?? "");
+  if (row) return row.value;
+  return def?.fallback ?? explicitFallback ?? "";
 }
 
 /** 管理页用：取出全部配置（含尚未写入库的项）。 */
