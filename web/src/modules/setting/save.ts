@@ -41,7 +41,12 @@ export async function saveSettings(
     const raw = form.get(def.key);
     if (raw === null) continue;
 
-    const value = String(raw).trim();
+    // 规范化换行符。
+    //
+    // 浏览器的 <textarea> 提交多行文本时用 CRLF（\r\n），而存进数据库后
+    // 那个 \r 会一直留着：显示上通常看不出问题，但它会占字节数，
+    // 也可能与某些聊天客户端的渲染冲突。CR 在这里没有任何用处，一律去掉。
+    const value = String(raw).replace(/\r\n?/g, "\n").trim();
 
     if (value.length > def.maxLength) {
       return { ok: false, error: `${def.label}超过 ${def.maxLength} 字` };
