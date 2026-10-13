@@ -63,6 +63,9 @@ services:
       BOT_HEALTH_URL: http://bot:8000
       # NapCat 二维码文件所在目录（只读挂载）。掉线时管理面板据此显示二维码。
       NAPCAT_QR_PATH: /app/napcat-cache/qrcode.png
+      # LLBot 的二维码路径（同样只读挂载）。两个协议端的码位置不同，
+      # 面板按看门狗上报的 activeService 选择读哪一个。
+      LLBOT_QR_PATH: /app/llbot-cache/temp/login-qrcode.png
       # 看门狗的状态文件（只读）。面板据此显示「是否尝试过自动恢复」。
       WATCHDOG_STATE_PATH: /app/watchdog-state/napcat-watchdog.json
     volumes:
@@ -71,6 +74,8 @@ services:
       - uploads_data:/app/uploads
       # NapCat 二维码：**只读**挂载 —— web 只需读取，给它写权限没有必要。
       - napcat_cache:/app/napcat-cache:ro
+      # LLBot 的 data 目录：同样只读，只为读它写的登录二维码。
+      - llbot_data:/app/llbot-cache:ro
       # 看门狗状态目录（由宿主机脚本写入）：同样只读，web 不该改它。
       - ./state:/app/watchdog-state:ro
     depends_on:
@@ -112,7 +117,49 @@ services:
         condition: service_healthy
     networks: [backend]
 
-  # ---------- QQ 协议端 ----------
+  # ---------- QQ 协议端（二选一）----------
+  #
+  # 本机同时存在两套协议端实现，**同一时间只能启用一个**。
+  #
+  # ⚠️ 这不只是「会互相踢下线」的问题 —— 看门狗与网站面板都靠
+  #    「哪个协议端容器在运行」来判断当前用的是哪一个。两个同时运行会
+  #    导致判断错误（曾实测：LLBot 在等扫码、NapCat 正在服务，
+  #    却被判定为 llbot，于是面板去找了一个空目录的二维码）。
+  #
+  #    切换时的正确顺序：先停掉正在服务的那个，再启动要用的那个。
+  #
+  # 为什么要两套：NapCat（跑官方 QQ 客户端）在本机实测会周期性被踢下线，
+  # 而同机的 LLBot（LagrangeV2 纯协议实现，不跑 QQ 客户端）连续稳定多日。
+  # 故改为以 LLBot 为主，NapCat 保留作为可随时回退的备选。
+  #
+  # 切换方式见 README「协议端」一节；两者的登录态各自持久化，回退只需重新启用。
+  llbot:
+    # 本机拉取 Docker Hub / GitHub 均不稳定，镜像在本地构建后 docker save 传入
+    image: nefu-pa-llbot:local
+    restart: unless-stopped
+    profiles: [llbot]
+    environment:
+      # ⚠️ 这一项决定「重启后要不要重新扫码」。
+      #
+      # LLBot 的 startup.sh 逻辑：设了 AUTO_LOGIN_QQ 就执行
+      #   node ./llbot.js -q <QQ号>    # 快速登录
+      # 且**每次启动都会传** —— 不像 NapCat 那样在内部重启后丢掉该参数。
+      AUTO_LOGIN_QQ: ${BOT_QQ:-}
+      # WebUI 端口。LLBot 默认 3080，与本机 DSH 网页界面冲突，故改到 3081。
+      WEBUI_PORT: "3081"
+    ports:
+      # 仅绑定本机回环，不对外暴露
+      - "127.0.0.1:3081:3081"
+    volumes:
+      # 登录态与配置（首次仍需扫码，之后靠 AUTO_LOGIN_QQ 免扫）
+      - llbot_data:/app/llbot/data
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+    networks: [backend]
+
+  # ---------- QQ 协议端（备选：NapCat）----------
   # 说明：NapCat 需要扫码登录，且必须挂在宿主网络才能与 QQ 服务器正常通信。
   #       因其涉及交互式登录，默认不随 compose 一起启动；
   #       首次部署请单独运行，详见 README「QQ 协议端」一节。
@@ -156,6 +203,7 @@ volumes:
   db_data:
   uploads_data: # 社团照片（D-31）
   napcat_cache: # NapCat 的二维码文件，供 web 只读读取
+  llbot_data: # LLBot 的登录态与配置
   caddy_data:
   caddy_config:
   napcat_config:

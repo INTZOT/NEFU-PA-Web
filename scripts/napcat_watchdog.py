@@ -35,10 +35,41 @@ from pathlib import Path
 
 PROJECT_DIR = Path(__file__).resolve().parent.parent
 STATE_DIR = PROJECT_DIR / "state"
-STATE_FILE = STATE_DIR / "napcat-watchdog.json"
+STATE_FILE = STATE_DIR / "protocol-watchdog.json"
+# 兼容改造前的状态文件名，避免丢掉「上次尝试」的记录
+_LEGACY_STATE_FILE = STATE_DIR / "napcat-watchdog.json"
 
-CONTAINER = os.environ.get("NAPCAT_CONTAINER", "nefu-pa-web-napcat-1")
 BOT_SERVICE = os.environ.get("BOT_SERVICE", "bot")
+
+# 可能存在的协议端容器，按优先级排列。
+#
+# 为什么是「多个」：项目里同时有两套实现（LLBot 为主、NapCat 备选），
+# **同一时间只启用一个**。看门狗不该写死其中一个 ——
+# 它会自动找出正在运行的那个，并对它做重启与日志判断。
+#
+# 识别方式不用 `docker ps`（需解析输出），而是直接探测 compose 服务名：
+# docker compose ps -q <service> 在服务未运行时返回空。
+PROTOCOL_CANDIDATES = [
+    {
+        "service": "llbot",
+        "container": os.environ.get("LLBOT_CONTAINER", "nefu-pa-web-llbot-1"),
+        "profile": "llbot",
+    },
+    {
+        "service": "napcat",
+        "container": os.environ.get("NAPCAT_CONTAINER", "nefu-pa-web-napcat-1"),
+        "profile": "napcat",
+    },
+]
+
+# 被踢下线的日志特征。
+#
+# ⚠️ 只放**明确表示「服务端主动踢下线」**的措辞，**不要**放 `Login Error`：
+#   扫码登录时也会周期性打印 Login Error（每次换码都有一条），
+#   把它当成被踢标志会在正常登录过程中触发重启 —— 反而制造不稳定。
+#
+# LLBot 的被踢措辞待实测补充（它底层是 LagrangeV2，用词可能不同）。
+KICK_MARKERS = ["KickedOffLine", "下线通知"]
 
 # 冷却窗口：这段时间内不重复尝试自动重启。
 # 取 30 分钟 —— 足够覆盖「重启 → 快速登录 → 确认成功」的全过程。
@@ -89,30 +120,54 @@ def bot_connected() -> bool:
         return False
 
 
-def kicked_offline() -> bool:
-    """看 NapCat 近期日志里有没有「被踢下线」。
+def active_protocol() -> dict | None:
+    """找出当前正在运行的协议端。
+
+    用 `compose ps -q <service>`：服务未运行时输出为空。
+    比解析 `docker ps` 的表格输出可靠。
+
+    **必须带 --profile** —— 两个服务都声明在 profiles 里，
+    不带 profile 时 compose 会认为该服务不存在。
+    """
+    for cand in PROTOCOL_CANDIDATES:
+        try:
+            res = compose(
+                "--profile", cand["profile"], "ps", "-q", cand["service"], timeout=30
+            )
+            if res.returncode == 0 and res.stdout.strip():
+                return cand
+        except Exception as exc:  # noqa: BLE001
+            log(f"探测 {cand['service']} 失败：{exc}")
+    return None
+
+
+def kicked_offline(container: str) -> bool:
+    """看协议端近期日志里有没有「被踢下线」的迹象。
 
     只有被踢才值得自动重启 —— 若是别的原因（比如容器正在启动），
     重启反而会打断正常的启动过程。
     """
     try:
         res = subprocess.run(
-            [DOCKER, "logs", "--since", LOG_LOOKBACK, CONTAINER],
+            [DOCKER, "logs", "--since", LOG_LOOKBACK, container],
             capture_output=True,
             text=True,
             timeout=60,
         )
-        return "KickedOffLine" in (res.stdout + res.stderr)
+        text = res.stdout + res.stderr
+        return any(m in text for m in KICK_MARKERS)
     except Exception as exc:  # noqa: BLE001
-        log(f"读取 NapCat 日志失败：{exc}")
+        log(f"读取 {container} 日志失败：{exc}")
         return False
 
 
 def read_state() -> dict:
-    try:
-        return json.loads(STATE_FILE.read_text(encoding="utf-8"))
-    except Exception:  # noqa: BLE001
-        return {}
+    for path in (STATE_FILE, _LEGACY_STATE_FILE):
+        try:
+            return json.loads(path.read_text(encoding="utf-8"))
+        except Exception:  # noqa: BLE001
+            continue
+    return {}
 
 
 def write_state(state: dict) -> None:
@@ -129,6 +184,10 @@ def main() -> int:
     now = int(time.time())
     state["checkedAt"] = now
 
+    # 无论连没连上，都记录当前在跑的协议端 —— 面板据此决定读哪个二维码文件。
+    current = active_protocol()
+    state["activeService"] = current["service"] if current else None
+
     if bot_connected():
         # 已连接：清掉「上次尝试」的痕迹，面板上就不会一直挂着告警
         if state.get("lastAttemptAt"):
@@ -137,13 +196,22 @@ def main() -> int:
             state.pop("lastAttemptResult", None)
         state.pop("lastSkipReason", None)
         write_state(state)
-        log("协议端已连接，无需处理")
+        log(f"协议端已连接（当前为 {current['service'] if current else '未知'}），无需处理")
         return 0
 
     log("协议端未连接")
 
-    if not kicked_offline():
-        log("但近期日志里没有被踢记录 —— 可能正在启动，本次不动")
+    # 找出**正在运行的那个**协议端 —— 项目里同时存在 LLBot 与 NapCat，
+    # 同一时间只启用一个。写死其中一个会在切换后失效。
+    proto = current
+    if proto is None:
+        log("没有任何协议端容器在运行 —— 无法自动恢复，需人工处理")
+        state["lastSkipReason"] = "no-protocol"
+        write_state(state)
+        return 0
+
+    if not kicked_offline(proto["container"]):
+        log(f"{proto['service']} 近期日志里没有被踢记录 —— 可能正在启动，本次不动")
         state["lastSkipReason"] = "not-kicked"
         write_state(state)
         return 0
@@ -157,14 +225,15 @@ def main() -> int:
         return 0
 
     if dry_run:
-        log("[dry-run] 本应重启 napcat 容器")
+        log(f"[dry-run] 本应重启 {proto['service']} 容器")
         return 0
 
-    log(f"检测到被踢下线且不在冷却期，重启 napcat（容器 {CONTAINER}）")
+    log(f"检测到被踢下线且不在冷却期，重启 {proto['service']}（容器 {proto['container']}）")
     try:
-        # compose restart 会让 entrypoint 重跑，从而恢复 -q 快速登录参数。
-        # 必须带 --profile napcat —— 该服务在 profiles 里，默认不参与 compose 命令。
-        res = compose("--profile", "napcat", "restart", "napcat", timeout=180)
+        # compose restart 会让容器的启动流程重跑，从而恢复快速登录参数
+        # （LLBot 读 AUTO_LOGIN_QQ，NapCat 读 ACCOUNT）。
+        # 必须带 --profile —— 两个服务都在 profiles 里，默认不参与 compose 命令。
+        res = compose("--profile", proto["profile"], "restart", proto["service"], timeout=180)
         ok = res.returncode == 0
         result = "restarted" if ok else f"failed: {(res.stderr or '').strip()[:200]}"
     except Exception as exc:  # noqa: BLE001
@@ -173,6 +242,7 @@ def main() -> int:
 
     state["lastAttemptAt"] = now
     state["lastAttemptResult"] = result
+    state["lastAttemptService"] = proto["service"]
     state.pop("lastSkipReason", None)
     write_state(state)
     log(f"重启结果：{result}")
