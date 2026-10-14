@@ -16,7 +16,7 @@
  *   两个协议端的落盘位置不同，故路径按当前协议端选择。
  */
 
-import { readFile, stat } from "node:fs/promises";
+import { readFile, readdir, stat } from "node:fs/promises";
 
 const BOT_HEALTH_URL = process.env.BOT_HEALTH_URL ?? "http://bot:8000";
 
@@ -40,6 +40,19 @@ const WATCHDOG_STATE_PATH =
 
 /** 超过这个时长没更新的二维码视为过期（协议端约每 2 分钟写一次）。 */
 const QR_FRESH_MS = 5 * 60 * 1000;
+
+/**
+ * LLBot 登录成功后落盘的会话目录（只读挂载）。
+ *
+ * 用途：**判断「二维码新鲜」到底是「在等登录」还是「刚登录完」**。
+ *
+ * 踩过的坑：只按「二维码文件新鲜」判断，会把刚扫码成功的那一刻误判为「仍在等登录」——
+ * 因为那个二维码文件在登录后仍会「新鲜」几分钟。结果刚登录成功，面板却报「登录已失效」。
+ * 反过来更糟：真正在等登录时若判断失灵，就会显示「运行中」（假在线）。
+ *
+ * 会话文件的 **mtime ≈ 登录成功时刻**，所以：二维码文件比会话文件新 → 真的在等登录。
+ */
+const LLBOT_DATA_DIR = process.env.LLBOT_DATA_DIR ?? "/app/llbot-cache";
 
 export interface BotStatus {
   /** 协议端是否已连接到 bot。 */
@@ -104,6 +117,46 @@ async function readQr(service: string | null): Promise<{
 }
 
 /**
+ * 判断二维码是否**真的**在等登录。
+ *
+ * 判据：二维码文件比「最近一次登录成功的会话文件」更新。
+ *
+ * 为什么不能只看二维码是否新鲜：扫码成功的那一刻二维码文件仍然新鲜，
+ * 于是会把「刚登录成功」误报成「登录已失效」。
+ * 会话文件的 mtime 就是登录成功时刻，比它新才说明之后又开始拉新码了。
+ */
+async function isWaitingForLogin(qrPath: string, qrFresh: boolean): Promise<boolean> {
+  if (!qrFresh) return false;
+
+  try {
+    const dir = await readdir(LLBOT_DATA_DIR);
+    const qrStat = await stat(qrPath);
+
+    // 找最近写入的会话文件（形如 qq-session-<uin>.json）
+    let newestSession = 0;
+    for (const name of dir) {
+      if (!name.startsWith("qq-session-")) continue;
+      try {
+        const s = await stat(`${LLBOT_DATA_DIR}/${name}`);
+        if (s.mtimeMs > newestSession) newestSession = s.mtimeMs;
+      } catch {
+        // 单个文件读失败不影响整体判断
+      }
+    }
+
+    // 没有会话文件 = 从未登录成功 → 确实在等登录
+    if (newestSession === 0) return true;
+
+    // 二维码比会话新 → 登录后又开始拉码（会话失效，需要重新登录）
+    return qrStat.mtimeMs > newestSession;
+  } catch {
+    // 读不到会话目录（未挂载等）时，退回原判据 —— 宁可提示登录失效，
+    // 也不要因为读不到目录就谎报「运行中」（假在线更危险）。
+    return true;
+  }
+}
+
+/**
  * 读取看门狗状态。
  *
  * 读不到（未安装看门狗、或文件尚未生成）时返回空值 ——
@@ -159,7 +212,13 @@ export async function getBotStatus(): Promise<BotStatus> {
   //
   // 而「协议端刚写了新二维码」这件事本身就无可辩驳：**它在等人登录**。
   // 这个信号由文件时间直接得出，不依赖任何日志文本。
-  const waitingForLogin = qr.qrFresh;
+  //
+  // 但**必须排除「刚登录成功」**——那时二维码文件也还新鲜，
+  // 否则会出现「扫码成功了，面板却报登录已失效」。判据见 isWaitingForLogin。
+  const qrPath = watchdog.activeService ? QR_PATHS[watchdog.activeService] : undefined;
+  const waitingForLogin = qrPath
+    ? await isWaitingForLogin(qrPath, qr.qrFresh)
+    : false;
 
   // ⚠️ 先算出「最终判定」，后面的字段**一律引用它**，不要各自去读 watchdog。
   //
