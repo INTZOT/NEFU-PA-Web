@@ -1,4 +1,5 @@
 import { cookies } from "next/headers";
+import { cleanupExpired } from "@/lib/cleanup";
 import { redirectTo } from "@/lib/redirect";
 import { startRegistration, echoBack } from "@/modules/account/register-flow";
 // ⚠️ cookie 名放在 lib 里，不在这里 export ——
@@ -24,6 +25,10 @@ export async function POST(request: Request) {
   // 用 next/headers 的 cookies()（App Router 里读请求 cookie 的正规方式）。
   const jar = await cookies();
   const previousHandoff = jar.get(HANDOFF_COOKIE)?.value ?? null;
+
+  // 顺带清一次过期数据（内部有 10 分钟节流，绝大多数请求只是看一眼时间戳）。
+  // 放在这里是因为注册是「会产生待确认记录」的主要入口。
+  await cleanupExpired();
 
   const result = await startRegistration(input, previousHandoff);
 

@@ -90,6 +90,11 @@ async def _confirm_registration(qq_number: str, send_group) -> None:
     if result == "expired":
         await send_group(messages.message("bot.group.confirmExpired"))
         return
+    if result == "student_id_taken":
+        # 学号已被占用（迁移 028 的唯一约束拦下）。
+        # 这是用户能自己修的问题，所以给出明确指引，而不是笼统的「出错了」。
+        await send_group(messages.message("bot.group.studentIdTaken"))
+        return
     # none：该号没有待确认。可能是群里闲聊时碰巧发了这几个字 —— 保持安静更合适。
     log.info("群内确认注册：无待确认记录 qq=%s", qq_number)
 

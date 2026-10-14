@@ -67,6 +67,16 @@ export async function startRegistration(
   );
   if (existing) return { ok: false, error: "该 QQ 号已注册，请直接登录或找回密码" };
 
+  // 学号同样要查重（迁移 028 已加唯一约束，这里先给出可读提示）。
+  // 之前只查 QQ 号不查学号，是「同一不变量、创建路径没查而修改路径查了」的遗漏。
+  const sameStudentId = await queryOne<{ id: string }>(
+    "SELECT id FROM users WHERE student_id = $1 LIMIT 1",
+    [studentId],
+  );
+  if (sameStudentId) {
+    return { ok: false, error: "该学号已被注册，请确认是否填错" };
+  }
+
   // 密码散列全项目只有一份实现（lib/password），此处复用
   const passwordHash = await hashPassword(input.password);
 

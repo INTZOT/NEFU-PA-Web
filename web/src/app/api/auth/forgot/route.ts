@@ -1,4 +1,5 @@
 import { redirectTo } from "@/lib/redirect";
+import { cleanupExpired } from "@/lib/cleanup";
 import { startReset } from "@/modules/account/reset-flow";
 
 /**
@@ -18,6 +19,9 @@ const COOKIE_MAX_AGE = 15 * 60;
 export async function POST(request: Request) {
   const form = await request.formData();
   const rawQq = String(form.get("qq") ?? "");
+
+  // 顺带清一次过期数据（找回密码同样会产生待确认记录）
+  await cleanupExpired();
 
   const result = await startReset(rawQq);
   const qq = rawQq.replace(/\D/g, "");

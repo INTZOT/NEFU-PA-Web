@@ -230,6 +230,18 @@ export const BOT_MESSAGES: BotMessageDef[] = [
     fallback: "目前没有即将开始的活动。",
   },
   {
+    key: "bot.group.studentIdTaken",
+    label: "【群聊】学号已被占用",
+    hint:
+      "注册时学号与他人重复（迁移 028 的唯一约束拦下）。" +
+      "这是用户能自己修的问题，文案要给出明确指引。",
+    maxLength: 250,
+    required: [],
+    fallback:
+      "❌ 注册未完成：该学号已被其他账号使用。\n" +
+      "请回到网站核对学号是否填错（多半是打错了一位），然后重新提交。",
+  },
+  {
     key: "bot.group.queryFailed",
     label: "【群聊】查询失败",
     hint: "查询约球/活动出错时的回复。",

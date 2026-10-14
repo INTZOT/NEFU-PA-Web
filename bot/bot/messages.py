@@ -64,6 +64,10 @@ _FALLBACKS: dict[str, str] = {
     "bot.group.confirmExpired": "这次注册确认已超时，请回到网站重新发起。",
     "bot.group.resetExpired": "这次重置确认已超时，请回到网站重新发起。",
     "bot.group.confirmFailed": "处理时出错了，请稍后再试或联系管理员。",
+    "bot.group.studentIdTaken": (
+        "❌ 注册未完成：该学号已被其他账号使用。\n"
+        "请回到网站核对学号是否填错（多半是打错了一位），然后重新提交。"
+    ),
     # ---- 群内查询（D-46）----
     "bot.group.roomList": (
         "🏓 当前有 {count} 个约球：\n{list}\n\n"

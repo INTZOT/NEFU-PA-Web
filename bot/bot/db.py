@@ -177,21 +177,29 @@ def confirm_registration(qq_number: str) -> str | None:
             # handoff：把发起注册时那个浏览器的凭据哈希一并存下（10 分钟有效）。
             # 它是「注册完自动进站」的唯一凭据 —— 没有它，轮询接口就只剩
             # 「用户存在」这个判据，那等于任意账号接管（已实测踩过这个坑）。
-            cur.execute(
-                """
-                INSERT INTO users (name, student_id, qq_number, password_hash,
-                                   handoff_hash, handoff_expires_at)
-                VALUES (%s, %s, %s, %s, %s, now() + interval '10 minutes')
-                RETURNING id
-                """,
-                (
-                    row["name"],
-                    row["student_id"],
-                    qq_number,
-                    row["password_hash"],
-                    row["handoff_hash"],
-                ),
-            )
+            #
+            # ⚠️ 学号已加唯一约束（迁移 028）。冲突时要返回可读结果 ——
+            # 否则会抛异常、群里只看到「处理时出错了」，用户完全不知道
+            # 是学号重复（多半是打错了一位）。
+            try:
+                cur.execute(
+                    """
+                    INSERT INTO users (name, student_id, qq_number, password_hash,
+                                       handoff_hash, handoff_expires_at)
+                    VALUES (%s, %s, %s, %s, %s, now() + interval '10 minutes')
+                    RETURNING id
+                    """,
+                    (
+                        row["name"],
+                        row["student_id"],
+                        qq_number,
+                        row["password_hash"],
+                        row["handoff_hash"],
+                    ),
+                )
+            except psycopg.errors.UniqueViolation:
+                conn.rollback()
+                return "student_id_taken"
             new_user = cur.fetchone()
             assert new_user is not None
 
