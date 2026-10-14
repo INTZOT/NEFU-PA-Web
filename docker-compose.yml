@@ -67,6 +67,9 @@ services:
       UPLOAD_DIR: /app/uploads
       # 机器人健康检查地址：用于管理面板显示「机器人是否在线」。
       BOT_HEALTH_URL: http://bot:8000
+      # 机器人内部接口：注册/重置时请它在群里 @ 某人（D-45）。
+      # 与 BOT_HEALTH_URL 同一个服务、同一个端口，只是用途不同。
+      BOT_INTERNAL_URL: http://bot:8000
       # NapCat 二维码文件所在目录（只读挂载）。掉线时管理面板据此显示二维码。
       NAPCAT_QR_PATH: /app/napcat-cache/qrcode.png
       # LLBot 的二维码路径（同样只读挂载）。两个协议端的码位置不同，
@@ -117,6 +120,9 @@ services:
       SHARED_RULES_TOKEN: ${SHARED_RULES_TOKEN:?请在 .env 中设置 SHARED_RULES_TOKEN}
       # 注册链接用（发给用户的文案里会带上它）
       SITE_URL: ${SITE_URL:-https://nefupa.intzot.asia}
+      # ⚠️ 要监听的 QQ 群号（D-45）。群内确认只在这个群里生效 ——
+      # 别的群一律不响应，避免误触发。未配置则完全不处理群消息。
+      BOT_GROUP_ID: ${BOT_GROUP_ID:-}
       # 反向 WebSocket 监听端口，NapCat 作为客户端连过来
       BOT_WS_PORT: "3002"
       ONEBOT_ACCESS_TOKEN: ${ONEBOT_ACCESS_TOKEN:-}

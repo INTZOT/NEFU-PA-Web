@@ -16,6 +16,8 @@ export const PLACEHOLDERS = {
   code: "邀请码",
   url: "网站地址（不含路径）",
   minPassword: "密码最小长度",
+  // 群聊确认流程（D-45）用：
+  name: "群内 @ 某人时的提醒（含 @ 段与姓名）",
 } as const;
 
 export type Placeholder = keyof typeof PLACEHOLDERS;
@@ -116,6 +118,74 @@ export const BOT_MESSAGES: BotMessageDef[] = [
     required: [],
     fallback:
       "我可以帮你注册与重置密码。\n发送「注册」获取邀请码，发送「重置密码」修改密码。",
+  },
+  // ---- 群聊确认流程（D-45）----
+  //
+  // 这些文案发在**群聊**里，所有人都能看到 —— 因此**绝不可包含任何凭据**。
+  // 唯一例外是 bot.group.resetLink（一次性改密链接），它走**私聊**，不发群。
+  {
+    key: "bot.group.confirmPrompt",
+    label: "【群聊】请确认注册",
+    hint: "注册时在群里 @ 本人。必须含 {name}，否则 @ 不到人。",
+    maxLength: 300,
+    required: ["name"],
+    fallback:
+      "{name} 请回复「确认注册」来完成注册。\n（如果你没有注册过，忽略这条消息即可）",
+  },
+  {
+    key: "bot.group.confirmResetPrompt",
+    label: "【群聊】请确认重置密码",
+    hint:
+      "重置密码时在群里 @ 本人。**务必保留「如果不是你，请忽略」那句** —— " +
+      "它是对「别人替你发起重置、你误确认」这种社交工程的唯一防线。",
+    maxLength: 300,
+    required: ["name"],
+    fallback:
+      "{name} 有人请求重置你的密码。\n" +
+      "如果这是你本人操作，请回复「确认重置」；\n" +
+      "如果不是你，请忽略这条消息。",
+  },
+  {
+    key: "bot.group.registerDone",
+    label: "【群聊】注册成功",
+    hint: "群内确认注册成功后的回复。",
+    maxLength: 200,
+    required: [],
+    fallback: "✅ 注册成功，现在可以到网站登录了。",
+  },
+  {
+    key: "bot.group.resetDone",
+    label: "【群聊】重置已确认",
+    hint:
+      "群内确认重置后的回复。**改密在网站同一浏览器里完成，不发链接** ——" +
+      "所以这条只应引导他回网站，不要写任何凭据。",
+    maxLength: 220,
+    required: [],
+    fallback: "✅ 已确认。请回到刚才那个浏览器页面设置新密码（10 分钟内有效）。",
+  },
+  {
+    key: "bot.group.confirmExpired",
+    label: "【群聊】注册确认超时",
+    hint: "待确认记录过期后才回复时。",
+    maxLength: 200,
+    required: [],
+    fallback: "这次注册确认已超时，请回到网站重新发起。",
+  },
+  {
+    key: "bot.group.resetExpired",
+    label: "【群聊】重置确认超时",
+    hint: "重置的待确认过期后。",
+    maxLength: 200,
+    required: [],
+    fallback: "这次重置确认已超时，请回到网站重新发起。",
+  },
+  {
+    key: "bot.group.confirmFailed",
+    label: "【群聊】确认处理失败",
+    hint: "系统异常时在群里回复。建议引导联系管理员。",
+    maxLength: 200,
+    required: [],
+    fallback: "处理时出错了，请稍后再试或联系管理员。",
   },
 ];
 

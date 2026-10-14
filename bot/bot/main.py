@@ -21,6 +21,8 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 
 import websockets
 
+from . import messages, shared_rules
+from .group_handlers import group_id, handle_group_message
 from .handlers import handle_message
 
 logging.basicConfig(
@@ -43,9 +45,92 @@ ACCESS_TOKEN = os.environ.get("ONEBOT_ACCESS_TOKEN", "")
 # 布尔赋值的原子性，且这里只用于状态展示，无需加锁。
 _connected = False
 
+# 当前活跃的协议端连接，供 HTTP 线程发起主动调用（群内 @ 通知）。
+#
+# 为什么要这个：HTTP 端点跑在**独立线程**里，而 websockets 对象属于 asyncio 事件循环，
+# 不能跨线程直接 await。这里保存引用，再用 run_coroutine_threadsafe 投递到事件循环。
+_ws = None
+_loop: asyncio.AbstractEventLoop | None = None
+
+
+def _notify_group_mention(qq_number: str, name: str, kind: str) -> bool:
+    """请机器人在群里 @ 某人（由 HTTP 线程调用）。
+
+    返回是否已投递。协议端未连接时返回 False —— 调用方据此回 503，
+    而不是假装成功（那会让网站在等一个永远不会来的 @ 消息）。
+    """
+    ws, loop = _ws, _loop
+    if ws is None or loop is None:
+        return False
+
+    key = "bot.group.confirmResetPrompt" if kind == "reset" else "bot.group.confirmPrompt"
+    text = messages.message(key, name=_mention(qq_number, name))
+    fut = asyncio.run_coroutine_threadsafe(
+        _call_api(ws, "send_group_msg", {"group_id": int(group_id()), "message": text}),
+        loop,
+    )
+    fut.result(timeout=10)
+    return True
+
+
+def _mention(qq_number: str, name: str) -> str:
+    """构造群内的 @ 段（OneBot 11 的 CQ 码）。"""
+    return f"[CQ:at,qq={qq_number}] {name}"
+
 
 class _HealthHandler(BaseHTTPRequestHandler):
-    """健康检查与状态上报，不承载业务。"""
+    """健康检查、状态上报，以及网站侧发来的「请在群里 @ 某人」请求。"""
+
+    def _json(self, status: int, payload: dict) -> None:
+        body = json.dumps(payload).encode()
+        self.send_response(status)
+        self.send_header("content-type", "application/json; charset=utf-8")
+        self.send_header("content-length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def do_POST(self) -> None:  # noqa: N802
+        """网站 → 机器人：请在群里 @ 某人完成确认。"""
+        if self.path != "/notify/confirm":
+            self.send_response(404)
+            self.end_headers()
+            return
+
+        token = os.environ.get("SHARED_RULES_TOKEN", "")
+        if token and self.headers.get("authorization", "") != f"Bearer {token}":
+            self._json(401, {"ok": False, "error": "unauthorized"})
+            return
+
+        length = int(self.headers.get("content-length") or 0)
+        if length <= 0 or length > 8192:
+            self._json(400, {"ok": False, "error": "bad length"})
+            return
+
+        try:
+            payload = json.loads(self.rfile.read(length).decode())
+        except (json.JSONDecodeError, UnicodeDecodeError):
+            self._json(400, {"ok": False, "error": "bad json"})
+            return
+
+        qq_number = str(payload.get("qq", "")).strip()
+        name = str(payload.get("name", "")).strip()
+        kind = str(payload.get("kind", "register")).strip()
+        if not qq_number or not name or not group_id():
+            self._json(400, {"ok": False, "error": "missing qq/name/group config"})
+            return
+
+        try:
+            sent = _notify_group_mention(qq_number, name, kind)
+        except Exception as exc:  # noqa: BLE001
+            log.exception("发送群内 @ 通知失败")
+            self._json(500, {"ok": False, "error": str(exc)})
+            return
+
+        if not sent:
+            self._json(503, {"ok": False, "error": "协议端未连接"})
+            return
+
+        self._json(200, {"ok": True})
 
     def do_GET(self) -> None:  # noqa: N802
         if self.path == "/healthz":
@@ -98,7 +183,7 @@ async def _call_api(ws, action: str, params: dict) -> None:
 
 
 async def _handle_connection(ws) -> None:
-    global _connected
+    global _connected, _ws, _loop
 
     if not _authorized(ws):
         log.warning("拒绝未授权的连接")
@@ -106,6 +191,9 @@ async def _handle_connection(ws) -> None:
         return
 
     _connected = True
+    # 供 HTTP 线程发起主动调用（群内 @ 通知）
+    _ws = ws
+    _loop = asyncio.get_running_loop()
     log.info("协议端已连接")
 
     async def send(user_id: str, text: str) -> None:
@@ -113,6 +201,13 @@ async def _handle_connection(ws) -> None:
             ws,
             "send_private_msg",
             {"user_id": int(user_id), "message": text},
+        )
+
+    async def send_group(text: str) -> None:
+        await _call_api(
+            ws,
+            "send_group_msg",
+            {"group_id": int(group_id()), "message": text},
         )
 
     try:
@@ -126,28 +221,47 @@ async def _handle_connection(ws) -> None:
             if event.get("echo") is not None:
                 continue
 
-            # 只处理私聊消息（D-12、D-15 都要求私聊）
             if event.get("post_type") != "message":
                 continue
-            if event.get("message_type") != "private":
-                continue
 
+            message_type = event.get("message_type")
             user_id = str(event.get("user_id", ""))
             text = str(event.get("raw_message", ""))
             if not user_id:
                 continue
 
-            log.info("收到私聊 来自 %s", user_id)
-            try:
-                await handle_message(send, user_id, text)
-            except Exception:
-                log.exception("处理消息出错")
+            if message_type == "group":
+                # 群聊：只用于「确认注册 / 确认重置」（D-45）。
+                # ⚠️ 传的是**发言者的 QQ 号**——这是整个确认机制的安全依据，
+                #    绝不使用消息文本里写的号码。
+                group = str(event.get("group_id", ""))
+                log.info("收到群消息 来自 %s（群 %s）", user_id, group)
+                try:
+                    await handle_group_message(
+                        group=group,
+                        sender=user_id,
+                        text=text,
+                        send_group=send_group,
+                        send_private=send,
+                    )
+                except Exception:
+                    log.exception("处理群消息出错")
+                continue
+
+            # 私聊：**已停用**（D-45）。
+            #
+            # 原注册流程要求成员私聊机器人领取邀请码，而「非好友私聊」正是腾讯风控的
+            # 高危模式。改为群内确认后，私聊不再承担任何流程，因此这里**完全不回复**——
+            # 回了反而又把机器人拉回「陌生人私聊」的行为特征里。
+            log.info("忽略私聊（已停用，D-45）来自 %s", user_id)
     except websockets.ConnectionClosed:
         log.warning("协议端连接断开")
     finally:
         # 任何退出路径（正常断开、异常、被取消）都要把状态置回未连接，
         # 否则状态会一直停在「已连接」，健康检查又变成假的。
         _connected = False
+        _ws = None
+        _loop = None
 
 
 async def _serve() -> None:

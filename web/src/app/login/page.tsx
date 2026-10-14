@@ -45,9 +45,18 @@ export default async function LoginPage({
         </button>
       </form>
 
+      {/*
+       * ⚠️ 这里的引导必须跟随重置流程走。
+       * 旧版写的是「私聊机器人发送重置密码」—— 那套已废弃（D-45）：
+       * 私聊机器人**不再有任何回复**，照做的用户会以为机器人坏了。
+       */}
       <div className="space-y-1 text-sm text-ink-muted">
         <p>
-          忘记密码？在 QQ 群私聊机器人发送「重置密码」即可。
+          忘记密码？
+          <Link href="/forgot" className="text-brand hover:underline">
+            点这里找回
+          </Link>
+          —— 机器人在群里 @ 你确认后即可设置新密码。
         </p>
         <p>
           还没有账号？

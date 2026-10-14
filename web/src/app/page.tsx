@@ -24,9 +24,10 @@ export default async function HomePage() {
   ]);
 
   // 首页文案可由管理员在 /admin/home 修改（取不到时回退到代码里的默认值）
-  const [heroTitle, heroSubtitle] = await Promise.all([
+  const [heroTitle, heroSubtitle, groupQq] = await Promise.all([
     getValue("home.hero.title"),
     getValue("home.hero.subtitle"),
+    getValue("home.group.qq"),
   ]);
 
   const upcoming = events
@@ -77,7 +78,7 @@ export default async function HomePage() {
                     href="/register"
                     className="!bg-surface !text-brand hover:!bg-surface/90"
                   >
-                    我有邀请码，去注册
+                    我是社团成员，去注册
                   </ButtonLink>
                   <ButtonLink
                     href="/login"
@@ -94,14 +95,23 @@ export default async function HomePage() {
       </section>
 
       {/* ---- 未登录时的加入说明 ---- */}
+      {/*
+       * ⚠️ 这段文案必须跟随注册流程走。
+       *
+       * 旧版写的是「私聊机器人拿邀请码」—— 那套流程已废弃（D-45）：
+       * 私聊机器人**不再有任何回复**，照做的用户会以为机器人坏了。
+       * 现在改为「群里 @ 确认」，且**全程不需要私聊**。
+       */}
       {!user ? (
         <Card className="p-5">
           <h2 className="font-semibold text-ink">怎么加入？</h2>
           <ol className="mt-3 space-y-2 text-sm text-ink-muted">
             {[
-              "在 QQ 群内私聊社团机器人，发送「注册」两个字。",
-              "机器人会给你一串专属邀请码（不要转发给别人）。",
-              "带着邀请码到本站注册，QQ 号会自动带入，无需填写。",
+              groupQq
+                ? `加入社团 QQ 群（群号 ${groupQq}）。已经在群里就跳过这步。`
+                : "加入社团 QQ 群。已经在群里就跳过这步。",
+              "点上面的「我是社团成员，去注册」，填姓名、学号、密码和你的 QQ 号。",
+              "提交后机器人会在群里 @ 你，你在群里回复「确认注册」即完成 —— 全程不用私聊机器人。",
             ].map((text, i) => (
               <li key={i} className="flex gap-3">
                 <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-brand-soft text-xs font-semibold text-brand-ink">

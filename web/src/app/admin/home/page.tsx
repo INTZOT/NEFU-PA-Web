@@ -21,7 +21,7 @@ export default async function HomeCopyAdminPage({
     <div className="space-y-6">
       <PageHeader
         title="首页文案"
-        description="这里是首页顶部（Hero）显示的文字。留空则回退到默认文案，不会变成空白。"
+        description="首页显示的文案与社团群号。留空则回退到默认值（群号除外，它必填）。"
         backHref="/admin"
         backLabel="管理后台"
       />
@@ -30,7 +30,9 @@ export default async function HomeCopyAdminPage({
 
       <form action="/api/admin/settings" method="post" className="space-y-4">
         {settings.map((s) => {
-          const def = s.key === "home.hero.subtitle";
+          // 用配置项自己的 maxLength，别写死 —— 否则新增的短字段（如群号限 20 位）
+          // 在界面上不受约束，只有提交时才被服务端挡回来，体验很差。
+          const isMultiline = s.key === "home.hero.subtitle";
           return (
             <div key={s.key} className="rounded-xl border border-line bg-surface p-4">
               <label className="block text-sm font-medium text-ink" htmlFor={s.key}>
@@ -38,16 +40,21 @@ export default async function HomeCopyAdminPage({
               </label>
 
               <div className="mt-2">
-                {def ? (
+                {isMultiline ? (
                   <Textarea
                     id={s.key}
                     name={s.key}
                     rows={3}
-                    maxLength={200}
+                    maxLength={s.maxLength}
                     defaultValue={s.value}
                   />
                 ) : (
-                  <Input id={s.key} name={s.key} maxLength={40} defaultValue={s.value} />
+                  <Input
+                    id={s.key}
+                    name={s.key}
+                    maxLength={s.maxLength}
+                    defaultValue={s.value}
+                  />
                 )}
               </div>
 

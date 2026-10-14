@@ -47,6 +47,23 @@ _FALLBACKS: dict[str, str] = {
     "bot.unknown": (
         "我可以帮你注册与重置密码。\n发送「注册」获取邀请码，发送「重置密码」修改密码。"
     ),
+    # ---- 群聊确认流程（D-45）----
+    "bot.group.confirmPrompt": (
+        "{name} 请回复「确认注册」来完成注册。\n"
+        "（如果你没有注册过，忽略这条消息即可）"
+    ),
+    "bot.group.confirmResetPrompt": (
+        "{name} 有人请求重置你的密码。\n"
+        "如果这是你本人操作，请回复「确认重置」；\n"
+        "如果不是你，请忽略这条消息。"
+    ),
+    "bot.group.registerDone": "✅ 注册成功，现在可以到网站登录了。",
+    "bot.group.resetDone": (
+        "✅ 已确认。请回到刚才那个浏览器页面设置新密码（10 分钟内有效）。"
+    ),
+    "bot.group.confirmExpired": "这次注册确认已超时，请回到网站重新发起。",
+    "bot.group.resetExpired": "这次重置确认已超时，请回到网站重新发起。",
+    "bot.group.confirmFailed": "处理时出错了，请稍后再试或联系管理员。",
 }
 
 _cache: dict[str, str] | None = None

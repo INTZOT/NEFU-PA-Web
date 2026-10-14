@@ -31,6 +31,15 @@ export const SETTING_DEFS = [
     fallback:
       "欢迎加入匹克球协会。这里发布社团公告与活动信息；成员登录后可使用约球大厅、活动报名与积分排行。",
   },
+  {
+    key: "home.group.qq",
+    label: "社团 QQ 群号",
+    maxLength: 20,
+    multiline: false,
+    // 必填：首页「怎么加入」要把它显示出来。留空会让新成员不知道该进哪个群。
+    validate: (v: string) => (/^[0-9]{5,12}$/.test(v.trim()) ? null : "请填 5~12 位数字的群号"),
+    fallback: "1103765322",
+  },
 ] as const;
 
 export type SettingKey = (typeof SETTING_DEFS)[number]["key"];
@@ -40,6 +49,8 @@ export interface SettingValue {
   label: string;
   value: string;
   fallback: string;
+  /** 该字段允许的最大长度。管理页据此设 maxLength，不要写死。 */
+  maxLength: number;
   updatedAt: string | null;
 }
 
@@ -88,6 +99,7 @@ export async function listAll(): Promise<SettingValue[]> {
       label: def.label,
       value: row?.value ?? def.fallback,
       fallback: def.fallback,
+      maxLength: def.maxLength,
       updatedAt: row?.updated_at ?? null,
     };
   });

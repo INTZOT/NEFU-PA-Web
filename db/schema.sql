@@ -247,3 +247,86 @@ CREATE INDEX IF NOT EXISTS room_applications_queue_idx ON room_applications(room
 INSERT INTO rating_configs (k_factor, note)
 SELECT 40, '初始配置：标准 ELO'
 WHERE NOT EXISTS (SELECT 1 FROM rating_configs);
+
+-- ============================================================
+-- 以下表由后续迁移新增。
+--
+-- ⚠️ 这份 schema.sql 只负责**首次建库**（postgres 官方镜像会在首次建库时
+--    执行 /docker-entrypoint-initdb.d/），此后所有结构变更都走
+--    web/db/migrations/ 下的迁移。
+--
+--    因此这里必须与迁移**保持同步** —— 否则读这份「权威 schema」的人
+--    会以为项目里只有 16 张表。以下内容按迁移编号顺序补录。
+-- ============================================================
+
+-- ---------- 17. 社团照片（迁移 010，D-31）----------
+CREATE TABLE IF NOT EXISTS photos (
+  id           uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  -- 卷内的文件名（由服务端生成，不用用户提供的名字，避免路径穿越）
+  filename     text        NOT NULL UNIQUE,
+  caption      text,
+  -- 精选：决定是否出现在首页（D-31 第三条）
+  is_featured  boolean     NOT NULL DEFAULT false,
+  width        integer,
+  height       integer,
+  bytes        integer,
+  uploaded_by  uuid REFERENCES users(id) ON DELETE SET NULL,
+  created_at   timestamptz NOT NULL DEFAULT now()
+);
+
+-- ---------- 18. 站点可配置文案（迁移 012，D-34）----------
+CREATE TABLE IF NOT EXISTS site_settings (
+  key        text PRIMARY KEY,
+  value      text NOT NULL DEFAULT '',
+  label      text NOT NULL,          -- 管理界面上的字段名，由代码维护
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  updated_by uuid REFERENCES users(id) ON DELETE SET NULL
+);
+
+-- ---------- 19. 站内消息通知（迁移 018，D-43）----------
+CREATE TABLE IF NOT EXISTS notifications (
+  id         uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id    uuid        NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  kind       text        NOT NULL,   -- 事件类型，如 room.applied
+  title      text        NOT NULL,   -- 已渲染的标题（写入时定稿）
+  body       text,
+  link       text,                   -- 站内跳转路径
+  dedupe_key text,                   -- 去重键：同一键在窗口内只留一条
+  read_at    timestamptz,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS notifications_user_idx
+  ON notifications (user_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS notifications_unread_idx
+  ON notifications (user_id) WHERE read_at IS NULL;
+
+-- ---------- 20. 群内确认：注册（迁移 022，D-45）----------
+CREATE TABLE IF NOT EXISTS pending_registrations (
+  id            uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  -- 与 users.qq_number 同样唯一：一个 QQ 号同时只能有一笔待确认，防止刷屏
+  qq_number     text        NOT NULL UNIQUE,
+  name          text        NOT NULL,
+  student_id    text        NOT NULL,
+  -- ⚠️ 必要的恶：确认发生在**另一个请求**里，密码必须活到那时。
+  --    缓解：① 10 分钟 TTL ② 确认后随记录一起删除 ③ 与正式密码同一套 scrypt。
+  password_hash text        NOT NULL,
+  created_at    timestamptz NOT NULL DEFAULT now(),
+  expires_at    timestamptz NOT NULL
+);
+
+-- ---------- 21. 群内确认：重置密码（迁移 022 + 024，D-45）----------
+CREATE TABLE IF NOT EXISTS pending_password_resets (
+  id             uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id        uuid        NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  -- 发起凭据的 sha256。明文只存在于发起者的 httpOnly cookie 里。
+  -- 改密要求「群里确认过」**且**「带着它」—— 见 D-45 方案 B。
+  initiator_hash text,
+  session_id     uuid        REFERENCES login_sessions(id) ON DELETE SET NULL,
+  created_at     timestamptz NOT NULL DEFAULT now(),
+  expires_at     timestamptz NOT NULL,
+  used_at        timestamptz,
+  -- 群内确认的时刻。为空表示还没人在群里确认，此时不允许改密。
+  confirmed_at   timestamptz
+);
+CREATE INDEX IF NOT EXISTS pending_resets_user_idx
+  ON pending_password_resets (user_id, created_at DESC);
