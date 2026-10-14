@@ -64,6 +64,29 @@ _FALLBACKS: dict[str, str] = {
     "bot.group.confirmExpired": "这次注册确认已超时，请回到网站重新发起。",
     "bot.group.resetExpired": "这次重置确认已超时，请回到网站重新发起。",
     "bot.group.confirmFailed": "处理时出错了，请稍后再试或联系管理员。",
+    # ---- 群内查询（D-46）----
+    "bot.group.roomList": (
+        "🏓 当前有 {count} 个约球：\n{list}\n\n"
+        "到网站「约球」页可以申请加入。"
+    ),
+    "bot.group.eventList": (
+        "📅 即将开始的活动（{count} 个）：\n{list}\n\n"
+        "到网站「活动」页可以报名。"
+    ),
+    "bot.group.noRooms": "目前没有正在招募的约球。\n你可以在网站「约球」页发起一个。",
+    "bot.group.noEvents": "目前没有即将开始的活动。",
+    "bot.group.queryFailed": "查询出错了，请稍后再试。",
+    # ---- 帮助 ----
+    "bot.group.help": (
+        "我是社团机器人，在群里可以做这些事：\n"
+        "\n"
+        "· 查询约球 —— 看当前有哪些约球、还差几人\n"
+        "· 查询活动 —— 看即将开始的活动、还剩几个名额\n"
+        "· 确认注册 —— 完成注册（网站提交后会 @ 你）\n"
+        "· 确认重置 —— 确认重置密码（网站提交后会 @ 你）\n"
+        "\n"
+        "注册与找回密码都在网站上发起，不用私聊我。"
+    ),
 }
 
 _cache: dict[str, str] | None = None

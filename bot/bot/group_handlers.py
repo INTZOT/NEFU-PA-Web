@@ -19,8 +19,13 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
+from datetime import datetime
+from zoneinfo import ZoneInfo
 
 from . import db, messages
+
+# 北京时间。显式指定，不依赖容器的本地时区设置。
+TZ_CN = ZoneInfo("Asia/Shanghai")
 
 log = logging.getLogger("bot.group")
 
@@ -59,6 +64,14 @@ async def handle_group_message(
         await _confirm_registration(sender, send_group)
     elif content == CONFIRM_RESET:
         await _confirm_reset(sender, send_group)
+    elif content in QUERY_ROOMS:
+        await _query_rooms(send_group)
+    elif content in QUERY_EVENTS:
+        await _query_events(send_group)
+    elif content == QUERY_ALL:
+        await _query_all(send_group)
+    elif content in HELP_COMMANDS:
+        await send_group(messages.message("bot.group.help"))
     # 其他群消息**静默**：群里闲聊不该触发机器人（会刷屏、也招风控）
 
 
@@ -118,3 +131,124 @@ async def _confirm_reset(qq_number: str, send_group) -> None:
         return
 
     await send_group(messages.message("bot.group.resetDone"))
+
+# ---------------------------------------------------------------------------
+# 群内查询：约球 / 活动（D-46）
+# ---------------------------------------------------------------------------
+
+# 群内可用的查询词。做成多个别名，因为中文里这几种说法都自然。
+QUERY_ALL = "查询"
+QUERY_ROOMS = ("查询约球", "约球", "查约球")
+QUERY_EVENTS = ("查询活动", "活动", "查活动")
+
+# 帮助。做成多个别名，因为群里有人会打「菜单」「命令」之类。
+HELP_COMMANDS = ("帮助", "help", "菜单", "命令")
+
+
+def _fmt_time(start, end) -> str:
+    """把时间渲染成群里好读的样子（今天/明天 + 北京时间）。
+
+    ⚠️ 必须**显式**转成北京时间，不能依赖容器的本地时区。
+
+    原因：数据库返回的 timestamptz 是**带时区的时间点**（psycopg 取出来通常是 UTC），
+    而 `datetime.now()` 是容器的本地时间。之前直接混用两者，
+    结果是北京时间 09:35 的约球被显示成「今天 01:35」——
+    看起来像数据错了，实际是少了一次时区换算。
+
+    显式换算还有个好处：即使将来容器 TZ 配错了，显示仍然正确。
+    """
+    if start is None:
+        return "时间待定"
+
+    start = start.astimezone(TZ_CN)
+    end = end.astimezone(TZ_CN) if end is not None else None
+
+    # 「今天/明天」比日期更贴近群里的说话习惯
+    today = datetime.now(TZ_CN).date()
+    delta = (start.date() - today).days
+    if delta == 0:
+        prefix = "今天"
+    elif delta == 1:
+        prefix = "明天"
+    elif 1 < delta < 7:
+        prefix = ["周一", "周二", "周三", "周四", "周五", "周六", "周日"][start.weekday()]
+    else:
+        prefix = f"{start.month}月{start.day}日"
+
+    out = f"{prefix} {start.strftime('%H:%M')}"
+    if end is not None:
+        return out + f"-{end.strftime('%H:%M')}"
+    return out + " 开始"
+
+
+async def _query_rooms(send_group) -> None:
+    """列出当前有效的约球。"""
+    try:
+        rooms = await asyncio.to_thread(db.list_open_rooms)
+    except Exception:
+        log.exception("查询约球失败")
+        await send_group(messages.message("bot.group.queryFailed"))
+        return
+
+    if not rooms:
+        await send_group(messages.message("bot.group.noRooms"))
+        return
+
+    lines: list[str] = []
+    for r in rooms:
+        ts = _fmt_time(r["start_at"], r["end_at"])
+        approved = r["approved"] or 0
+        pending = r["pending"] or 0
+        capacity = r["capacity"]
+        # 发起人占一个名额
+        joined = approved + 1
+        seats = max(0, capacity - joined)
+        status = "已满" if seats == 0 else f"还差 {seats} 人"
+        line = f"· {ts}｜{r["initiator_name"]}｜{joined}/{capacity}（{status}）"
+        if pending:
+            line += f"｜待处理 {pending}"
+        lines.append(line)
+
+    body = "\n".join(lines)
+    await send_group(messages.message("bot.group.roomList", count=len(rooms), list=body))
+
+
+async def _query_events(send_group) -> None:
+    """列出即将开始的活动。"""
+    try:
+        events = await asyncio.to_thread(db.list_upcoming_events)
+    except Exception:
+        log.exception("查询活动失败")
+        await send_group(messages.message("bot.group.queryFailed"))
+        return
+
+    if not events:
+        await send_group(messages.message("bot.group.noEvents"))
+        return
+
+    lines: list[str] = []
+    for e in events:
+        ts = _fmt_time(e["start_at"], None).replace(" 开始", "")
+        kind = "双打" if e["format"] == "doubles" else "单打"
+        unit = "队" if e["capacity_unit"] == "teams" else "人"
+        registered = e["registered"] or 0
+        waitlisted = e["waitlisted"] or 0
+        capacity = e["capacity"]
+        seats = max(0, capacity - registered)
+        status = "已满" if seats == 0 else f"还剩 {seats}{unit}"
+        line = f"· {ts}｜{e['title']}（{kind}）｜{registered}/{capacity}（{status}）"
+        if e["location"]:
+            line += f"｜{e['location']}"
+        if waitlisted:
+            line += f"｜候补 {waitlisted}"
+        lines.append(line)
+
+    body = "\n".join(lines)
+    await send_group(messages.message("bot.group.eventList", count=len(events), list=body))
+
+
+async def _query_all(send_group) -> None:
+    """「查询」不带宾语时：两样都给。"""
+    await _query_rooms(send_group)
+    await _query_events(send_group)
+

@@ -18,6 +18,9 @@ export const PLACEHOLDERS = {
   minPassword: "密码最小长度",
   // 群聊确认流程（D-45）用：
   name: "群内 @ 某人时的提醒（含 @ 段与姓名）",
+  // 群内查询（D-46）用：
+  count: "条数",
+  list: "逐条列出的内容",
 } as const;
 
 export type Placeholder = keyof typeof PLACEHOLDERS;
@@ -186,6 +189,71 @@ export const BOT_MESSAGES: BotMessageDef[] = [
     maxLength: 200,
     required: [],
     fallback: "处理时出错了，请稍后再试或联系管理员。",
+  },
+  // ---- 群内查询（D-46）----
+  {
+    key: "bot.group.roomList",
+    label: "【群聊】约球列表",
+    hint:
+      "群里发「查询约球」时的回复。**必须含 {list}** —— 否则一条约球都看不到。" +
+      "{count} 是条数。",
+    maxLength: 800,
+    required: ["list"],
+    fallback:
+      "🏓 当前有 {count} 个约球：\n{list}\n\n" +
+      "到网站「约球」页可以申请加入。",
+  },
+  {
+    key: "bot.group.eventList",
+    label: "【群聊】活动列表",
+    hint: "群里发「查询活动」时的回复。**必须含 {list}**。",
+    maxLength: 800,
+    required: ["list"],
+    fallback:
+      "📅 即将开始的活动（{count} 个）：\n{list}\n\n" +
+      "到网站「活动」页可以报名。",
+  },
+  {
+    key: "bot.group.noRooms",
+    label: "【群聊】没有约球",
+    hint: "当前没有正在招募的约球时的回复。",
+    maxLength: 200,
+    required: [],
+    fallback: "目前没有正在招募的约球。\n你可以在网站「约球」页发起一个。",
+  },
+  {
+    key: "bot.group.noEvents",
+    label: "【群聊】没有活动",
+    hint: "当前没有即将开始的活动时的回复。",
+    maxLength: 200,
+    required: [],
+    fallback: "目前没有即将开始的活动。",
+  },
+  {
+    key: "bot.group.queryFailed",
+    label: "【群聊】查询失败",
+    hint: "查询约球/活动出错时的回复。",
+    maxLength: 200,
+    required: [],
+    fallback: "查询出错了，请稍后再试。",
+  },
+  {
+    key: "bot.group.help",
+    label: "【群聊】帮助",
+    hint:
+      "群里发「帮助」时的回复。改这里即可调整命令列表 —— " +
+      "**新增命令时记得同步这一条**，否则用户看不到它。",
+    maxLength: 600,
+    required: [],
+    fallback:
+      "我是社团机器人，在群里可以做这些事：\n" +
+      "\n" +
+      "· 查询约球 —— 看当前有哪些约球、还差几人\n" +
+      "· 查询活动 —— 看即将开始的活动、还剩几个名额\n" +
+      "· 确认注册 —— 完成注册（网站提交后会 @ 你）\n" +
+      "· 确认重置 —— 确认重置密码（网站提交后会 @ 你）\n" +
+      "\n" +
+      "注册与找回密码都在网站上发起，不用私聊我。",
   },
 ];
 

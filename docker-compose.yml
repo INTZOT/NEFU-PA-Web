@@ -120,6 +120,10 @@ services:
       SHARED_RULES_TOKEN: ${SHARED_RULES_TOKEN:?请在 .env 中设置 SHARED_RULES_TOKEN}
       # 注册链接用（发给用户的文案里会带上它）
       SITE_URL: ${SITE_URL:-https://nefupa.intzot.asia}
+      # ⚠️ 时区。**不能省** —— 容器默认 UTC，而群内查询要显示「今天/明天 + 北京时间」。
+      # 漏掉它时，北京时间 09:35 的约球会显示成「今天 01:35」，
+      # 看起来像数据错了，实际是时区没设。（需配合镜像里的 tzdata，见 bot/Dockerfile）
+      TZ: Asia/Shanghai
       # ⚠️ 要监听的 QQ 群号（D-45）。群内确认只在这个群里生效 ——
       # 别的群一律不响应，避免误触发。未配置则完全不处理群消息。
       BOT_GROUP_ID: ${BOT_GROUP_ID:-}

@@ -295,3 +295,63 @@ def mark_reset_confirmed(user_id: str) -> bool:
         conn.commit()
     return ok
 
+
+# ---------------------------------------------------------------------------
+# 群内查询：约球 / 活动（D-46）
+# ---------------------------------------------------------------------------
+
+
+def list_open_rooms(limit: int = 8) -> list[dict[str, Any]]:
+    """当前有效的约球（招募中 / 已满，且未过期）。
+
+    与网站大厅同一口径：只取 open/full，且 expires_at 未过。
+    发起人占一个名额，所以「还差几人」= 上限 - 已通过 - 1。
+    """
+    with _connect() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT
+                  r.id,
+                  r.start_at,
+                  r.end_at,
+                  r.capacity,
+                  r.status,
+                  i.name AS initiator_name,
+                  (SELECT count(*)::int FROM room_applications a
+                    WHERE a.room_id = r.id AND a.status = 'approved') AS approved,
+                  (SELECT count(*)::int FROM room_applications a
+                    WHERE a.room_id = r.id AND a.status = 'pending')  AS pending
+                  FROM match_rooms r
+                  JOIN users i ON i.id = r.initiator_id
+                 WHERE r.status IN ('open','full') AND r.expires_at > now()
+                 ORDER BY r.start_at ASC
+                 LIMIT %s
+                """,
+                (limit,),
+            )
+            return list(cur.fetchall())
+
+
+def list_upcoming_events(limit: int = 8) -> list[dict[str, Any]]:
+    """即将开始的活动（已发布、未开始）。"""
+    with _connect() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT
+                  e.id, e.title, e.start_at, e.location, e.format,
+                  e.capacity, e.capacity_unit,
+                  (SELECT count(*)::int FROM event_registrations r
+                    WHERE r.event_id = e.id AND r.status = 'registered') AS registered,
+                  (SELECT count(*)::int FROM event_registrations r
+                    WHERE r.event_id = e.id AND r.status = 'waitlisted') AS waitlisted
+                  FROM events e
+                 WHERE e.status = 'open' AND e.start_at > now()
+                 ORDER BY e.start_at ASC
+                 LIMIT %s
+                """,
+                (limit,),
+            )
+            return list(cur.fetchall())
+
