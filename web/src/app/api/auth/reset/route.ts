@@ -6,7 +6,7 @@ import {
   applyReset,
   findResetByUser,
   findUserByQq,
-  verifyInitiator,
+  verifySecret,
 } from "@/modules/account/confirm";
 
 /** 发起凭据的 cookie 名。httpOnly，前端脚本读不到。 */
@@ -53,7 +53,7 @@ export async function POST(request: Request) {
     "SELECT initiator_hash FROM pending_password_resets WHERE id = $1",
     [pending.id],
   );
-  if (!verifyInitiator(initiator, stored?.initiator_hash ?? null)) {
+  if (!verifySecret(initiator, stored?.initiator_hash ?? null)) {
     return back("请回到发起重置的那个浏览器里完成改密");
   }
 

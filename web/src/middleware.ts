@@ -76,6 +76,9 @@ const HOUR_MS = 3_600_000;
 const LIMITS = {
   login: { perMinute: 10, perHour: 30 },
   register: { perMinute: 20, perHour: 60 },
+  // 其余认证接口（forgot / reset / */status）。这三个都是无认证公开接口，
+  // 但正常用户一分钟内绝不会请求几十次，所以给得比 login 宽、比无限好。
+  authOther: { perMinute: 30, perHour: 120 },
 } as const;
 
 type Kind = keyof typeof LIMITS;
@@ -148,15 +151,24 @@ export function middleware(request: NextRequest) {
   };
 
   // ---- 认证接口限流 ----
-  const kind: Kind | null =
-    pathname === "/api/auth/login"
-      ? "login"
-      : pathname === "/api/auth/register"
-        ? "register"
-        : null;
+  //
+  // ⚠️ 覆盖**全部** /api/auth/*，不只是 login / register。
+  //
+  // 之前只匹配两个精确路径且要求 POST，于是 forgot / reset / register/status /
+  // forgot/status **完全没有限流** —— 而它们是无认证的公开接口：
+  //   * forgot 每次都会触发一次跨容器 HTTP 调用 + 群里 @ 一个人，
+  //     可被用来定向骚扰任意成员（配合枚举还能拿到成员名单）；
+  //   * */status 可被用来批量探测 QQ 号。
+  // 用前缀匹配 + 不限方法，避免下次新增接口时又漏掉。
+  let kind: Kind | null = null;
+  if (pathname.startsWith("/api/auth/")) {
+    if (pathname.startsWith("/api/auth/login")) kind = "login";
+    else if (pathname.startsWith("/api/auth/register")) kind = "register";
+    else kind = "authOther";
+  }
 
   // 不是认证接口：只需注入 CSP，直接放行
-  if (!kind || request.method !== "POST") {
+  if (!kind) {
     return withSecurity(NextResponse.next({ request: { headers: requestHeaders } }));
   }
 

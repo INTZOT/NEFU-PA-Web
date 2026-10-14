@@ -70,6 +70,10 @@ services:
       # 机器人内部接口：注册/重置时请它在群里 @ 某人（D-45）。
       # 与 BOT_HEALTH_URL 同一个服务、同一个端口，只是用途不同。
       BOT_INTERNAL_URL: http://bot:8000
+      # 站点对外地址。web 侧用它做**重定向主机名白名单**（lib/redirect.ts）：
+      # 只有当请求头里的主机名与它一致时才采用，否则回退到它。
+      # 这样即使将来代理配置变化导致 X-Forwarded-Host 可被伪造，也跳不出去。
+      SITE_URL: ${SITE_URL:-https://nefupa.intzot.asia}
       # NapCat 二维码文件所在目录（只读挂载）。掉线时管理面板据此显示二维码。
       NAPCAT_QR_PATH: /app/napcat-cache/qrcode.png
       # LLBot 的二维码路径（同样只读挂载）。两个协议端的码位置不同，

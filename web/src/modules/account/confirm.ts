@@ -30,19 +30,129 @@ export async function createPendingRegistration(input: {
   name: string;
   studentId: string;
   passwordHash: string;
-}): Promise<void> {
-  await query(
-    `INSERT INTO pending_registrations
-            (qq_number, name, student_id, password_hash, expires_at)
-     VALUES ($1, $2, $3, $4, now() + ($5 || ' minutes')::interval)
-     ON CONFLICT (qq_number) DO UPDATE
-        SET name = EXCLUDED.name,
-            student_id = EXCLUDED.student_id,
-            password_hash = EXCLUDED.password_hash,
-            created_at = now(),
-            expires_at = EXCLUDED.expires_at`,
-    [input.qq, input.name, input.studentId, input.passwordHash, String(TTL_MINUTES)],
+  /**
+   * 发起凭据的 sha256（handoff）。
+   *
+   * ⚠️ 这是「注册完自动进站」的**唯一凭据**，不能省。
+   *
+   * 没有它时，轮询接口只能靠「用户是否已存在」判断注册是否完成 ——
+   * 而所有老用户都「已存在」，于是那个接口变成了
+   * **一个请求接管任意账号**的后门（实测确认过，见迁移 026）。
+   */
+  handoffHash: string;
+  /**
+   * 该浏览器上一次的 handoff **明文**（来自它的 cookie）。
+   *
+   * 用来判断「这次提交是不是**同一个浏览器**在重试」。
+   *
+   * ⚠️ 必须传明文、由这里比对（verifySecret 内部会哈希）。
+   *    写成「传哈希再比哈希」会双重哈希而恒不匹配。
+   */
+  previousHandoff?: string | null;
+}): Promise<{ ok: true } | { ok: false; error: string }> {
+  return withTransaction(async (client) => {
+    // ⚠️ 锁住可能存在的旧记录，避免并发下互相覆盖。
+    //
+    // 为什么要判「是不是同一个人」：
+    //   曾经的写法是无条件 `ON CONFLICT DO UPDATE`，于是一个**抢注**攻击成立 ——
+    //     ① 受害者用自己 QQ 提交注册（记录里是他的密码哈希与 handoff）；
+    //     ② 攻击者用**同一个 QQ** 提交自己的姓名/学号/密码 → 覆盖掉记录；
+    //     ③ 受害者在群里回复「确认注册」（他本来就要回）→
+    //        bot 按记录建号 = 受害者的 QQ + **攻击者的密码**；
+    //     ④ 攻击者用自己的密码直接登录，账号到手。
+    //   覆盖是给「自己填错了重来」用的，不该让第三者顶掉。
+    const existing = await client.query<{ handoff_hash: string | null }>(
+      "SELECT handoff_hash FROM pending_registrations WHERE qq_number = $1 FOR UPDATE",
+      [input.qq],
+    );
+    const row = existing.rows[0];
+    if (row) {
+      // ⚠️ 必须**比对**旧凭据，不能只检查「它存在」。
+      //
+      // 我第一版写成了 `if (row?.handoff_hash && input.previousHandoffHash)` ——
+      // 只要求两边都非空。而 nefu_reg_handoff 是**全局 cookie，不区分 QQ 号**，
+      // 于是攻击者只要先用任意一个未注册的 QQ 号提交一次注册（拿到一个 cookie），
+      // 再提交受害者 QQ 时「旧凭据存在」就成立，覆盖被放行 —— 抢注照旧。
+      // 只有确认「这个 cookie 就是当初写这条记录的那一个」才算自己重试。
+      const isSameBrowser = verifySecret(
+        input.previousHandoff ?? "",
+        row.handoff_hash,
+      );
+      if (!isSameBrowser) {
+        return {
+          ok: false as const,
+          error:
+            "该 QQ 号已有一笔待确认的注册（可能是你之前提交过）。" +
+            "请等它超时（10 分钟）后再试，或联系管理员。",
+        };
+      }
+    }
+
+    await client.query(
+      `INSERT INTO pending_registrations
+              (qq_number, name, student_id, password_hash, handoff_hash, expires_at)
+       VALUES ($1, $2, $3, $4, $5, now() + ($6 || ' minutes')::interval)
+       ON CONFLICT (qq_number) DO UPDATE
+          SET name = EXCLUDED.name,
+              student_id = EXCLUDED.student_id,
+              password_hash = EXCLUDED.password_hash,
+              handoff_hash = EXCLUDED.handoff_hash,
+              created_at = now(),
+              expires_at = EXCLUDED.expires_at`,
+      [
+        input.qq,
+        input.name,
+        input.studentId,
+        input.passwordHash,
+        input.handoffHash,
+        String(TTL_MINUTES),
+      ],
+    );
+    return { ok: true as const };
+  });
+}
+
+/**
+ * 校验并消费注册进站凭据（handoff）。
+ *
+ * 成功返回用户 id（并**立即清除**凭据 —— 一次性），失败返回 null。
+ *
+ * 这是「注册完自动进站」的正确实现：
+ *   只有**发起注册的那个浏览器**手里的 cookie 才能换来会话，
+ *   而不是「只要这个 QQ 号已注册就发会话」。
+ */
+export async function consumeRegistrationHandoff(
+  qq: string,
+  plain: string,
+): Promise<string | null> {
+  if (!plain) return null;
+
+  const row = await queryOne<{ id: string; handoff_hash: string | null }>(
+    `SELECT id, handoff_hash FROM users
+      WHERE qq_number = $1
+        AND handoff_hash IS NOT NULL
+        AND handoff_expires_at > now()
+      LIMIT 1`,
+    [qq],
   );
+  if (!row?.handoff_hash) return null;
+
+  // ⚠️ 传**明文**，让 verifySecret 内部去哈希。
+  //
+  // 这里曾经写成 `verifyInitiator(sha256(plain), row.handoff_hash)` ——
+  // 而 verifyInitiator 内部又会哈希一次，于是比较的是
+  // sha256(sha256(handoff)) === sha256(handoff)，**恒为 false**：
+  // 注册永远完成不了，用户卡在「等待确认」页。
+  // 教训：把「比较明文」与「比较哈希」两种契约混在一个函数里必然出错 ——
+  // 现在函数名与形参名都显式写明「接受明文」。
+  if (!verifySecret(plain, row.handoff_hash)) return null;
+
+  // 一次性：立刻作废，防止凭据被重放
+  await query(
+    "UPDATE users SET handoff_hash = NULL, handoff_expires_at = NULL WHERE id = $1",
+    [row.id],
+  );
+  return row.id;
 }
 
 /**
@@ -62,7 +172,9 @@ export async function registrationStatus(qq: string): Promise<ConfirmStatus> {
     "SELECT (expires_at < now()) AS expired FROM pending_registrations WHERE qq_number = $1 LIMIT 1",
     [qq],
   );
-  if (!pending) return "missing";
+  // 没有待确认记录：可能是没发起过，也可能是过期后被清理了。
+  // 一律按「已过期」报给前端 —— 让用户能重新发起，而不是无限转圈。
+  if (!pending) return "expired";
   return pending.expired ? "expired" : "pending";
 }
 
@@ -144,7 +256,7 @@ export async function findResetByUser(userId: string): Promise<ResetLookup | nul
  * 用 sha256 而不是 scrypt：这个值是高熵随机串（192 位），不是人类密码，
  * 不存在字典攻击的余地，没有必要用慢哈希。
  */
-export function verifyInitiator(plain: string, hashHex: string | null): boolean {
+export function verifySecret(plain: string, hashHex: string | null): boolean {
   if (!plain || !hashHex) return false;
   const actual = createHash("sha256").update(plain).digest("hex");
   // 定长比较，避免时序侧信道（此处风险很低，但习惯成自然）
@@ -156,7 +268,7 @@ export function verifyInitiator(plain: string, hashHex: string | null): boolean 
  *
  * ⚠️ 调用方**必须**先校验两件事，本函数不再重复校验：
  *   1. 群里已确认（`findResetByUser().confirmed === true`）—— 证明 QQ 号所有权
- *   2. 发起凭据 cookie 与库里的哈希一致（`verifyInitiator`）—— 证明是同一个浏览器
+ *   2. 发起凭据 cookie 与库里的哈希一致（`verifySecret`）—— 证明是同一个浏览器
  * 两者缺一不可：只有第 1 条则「谁确认谁就能改」（可被社交工程利用），
  * 只有第 2 条则「谁发起谁就能改」（失去了 QQ 所有权证明）。
  *

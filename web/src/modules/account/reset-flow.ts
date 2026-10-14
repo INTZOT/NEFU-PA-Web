@@ -68,18 +68,21 @@ export async function startReset(rawQq: string): Promise<ResetStartResult> {
 }
 
 /**
- * 轮询：这笔重置申请当前处于哪一步。
- *
- * - `none`      没有有效申请（未注册 / 已过期 / 超时）
- * - `pending`   已受理，等群内确认
- * - `confirmed` 群里已确认 → 前端就地弹出改密表单
- */
-/**
  * 轮询重置申请的状态。
  *
- * - `none`    没有有效申请（未注册 / 已过期 / 超时）
- * - `pending` 已受理，等群内确认
+ * - `pending`   已受理（或尚未受理），等群内确认
  * - `confirmed` 群里已确认 → 前端就地弹出改密表单
+ * - `none`      输入格式非法
+ *
+ * ⚠️ 这里**刻意不区分「该 QQ 号是否已注册」**。
+ *
+ * 原因：这是无认证的公开接口。若「未注册」与「已注册但未确认」返回不同值，
+ * 它就成了**批量枚举社团成员 QQ 号**的工具 —— 而这正是发起重置时
+ * 特意做「未注册也返回成功」要防的事。之前只做了发起侧、漏了轮询侧，
+ * 等于白防（已实测确认可区分：none vs pending）。
+ *
+ * 未注册时返回 `pending` 是安全的：它永远变不成 `confirmed`，
+ * 用户看到的就是「一直在等待确认」，与「确实没注册」的观感一致。
  */
 export async function resetStatus(
   rawQq: string,
@@ -95,7 +98,8 @@ export async function resetStatus(
       ORDER BY r.created_at DESC LIMIT 1`,
     [qq],
   );
-  if (!row) return "none";
+  // 没有记录（未注册 / 已过期 / 还没发起）→ 一律当作「等待中」，不泄露区别
+  if (!row) return "pending";
   return row.confirmed ? "confirmed" : "pending";
 }
 

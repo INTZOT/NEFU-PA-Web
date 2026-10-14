@@ -461,11 +461,30 @@ async function cancelTx(
     );
 
     const toCancel = [userId, ...partner.rows.map((r) => r.partner_id)];
+
+    // ⚠️ 必须先看**被取消者的原状态**，不能只「UPDATE 完就递补」。
+    //
+    // 曾经的写法正是后者，于是：取消一个**候补**（他本来就不占名额、
+    // 没有释放任何位置）也会把另一个候补升为 registered ——
+    // 结果 occupied 超过 capacity，名额上限被破坏。
+    // 同理，调用者若已 'absent'（也不再占名额），同样不该触发递补。
+    //
+    // 判据：本次是否真的释放了 **registered** 名额。
+    // 因此先查原状态，再更新（两步都在同一事务里，且赛事行已被 FOR UPDATE 锁住，
+    // 不存在中间被改动的可能）。
+    const before = await client.query<{ status: RegistrationStatus }>(
+      `SELECT status FROM event_registrations
+        WHERE event_id = $1 AND user_id = ANY($2::uuid[])
+          AND status IN ('registered','waitlisted','absent')`,
+      [eventId, toCancel],
+    );
+    const releasedSlots = before.rows.filter((r) => r.status === "registered").length;
+
     await client.query(
       `UPDATE event_registrations
           SET status = 'cancelled', cancelled_at = now()
         WHERE event_id = $1 AND user_id = ANY($2::uuid[])
-          AND status IN ('registered','waitlisted')`,
+          AND status IN ('registered','waitlisted','absent')`,
       [eventId, toCancel],
     );
 
@@ -479,24 +498,27 @@ async function cancelTx(
       );
     }
 
-    // 自动递补：按报名时间取最早的候补
-    const waitlisted = await client.query<{ user_id: string }>(
-      `SELECT w.user_id FROM event_registrations w
-        WHERE w.event_id = $1 AND w.status = 'waitlisted'
-        ${WAITLIST_ORDER_SQL}
-        LIMIT 1`,
-      [eventId],
-    );
-
+    // 自动递补：只有真的空出了名额才递补，且一次只补 releasedSlots 个。
+    //
+    // 不加这两个条件就会出现「取消候补 → 递补候补 → 超额」。
     let promoted: string | null = null;
-    if (waitlisted.rows[0]) {
-      promoted = waitlisted.rows[0].user_id;
-      await client.query(
-        `UPDATE event_registrations
-            SET status = 'registered', promoted_at = now()
-          WHERE event_id = $1 AND user_id = $2`,
-        [eventId, promoted],
+    if (releasedSlots > 0) {
+      const waitlisted = await client.query<{ user_id: string }>(
+        `SELECT w.user_id FROM event_registrations w
+          WHERE w.event_id = $1 AND w.status = 'waitlisted'
+          ${WAITLIST_ORDER_SQL}
+          LIMIT 1`,
+        [eventId],
       );
+      if (waitlisted.rows[0]) {
+        promoted = waitlisted.rows[0].user_id;
+        await client.query(
+          `UPDATE event_registrations
+              SET status = 'registered', promoted_at = now()
+            WHERE event_id = $1 AND user_id = $2`,
+          [eventId, promoted],
+        );
+      }
     }
 
     return {

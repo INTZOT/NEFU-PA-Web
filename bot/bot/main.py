@@ -13,9 +13,11 @@
 from __future__ import annotations
 
 import asyncio
+import hmac
 import json
 import logging
 import os
+import re
 import threading
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
@@ -64,18 +66,37 @@ def _notify_group_mention(qq_number: str, name: str, kind: str) -> bool:
         return False
 
     key = "bot.group.confirmResetPrompt" if kind == "reset" else "bot.group.confirmPrompt"
-    text = messages.message(key, name=_mention(qq_number, name))
+
+    # ⚠️ 用**消息段数组**而不是拼接 CQ 字符串。
+    #
+    # 拼接写法 `f"[CQ:at,qq={qq}] {name}"` 有两个注入面：
+    #   * name 是用户自填的，可以写成 `[CQ:at,qq=all]`、`[CQ:image,...]` ——
+    #     机器人会**以官方身份**在群里 @全体或发图；
+    #   * 请求体里的 qq 若不经校验，也能注入 CQ 段。
+    # 结构化消息段让注入面**从结构上消失**（协议端不再解析文本里的 CQ 码）。
+    segments = [
+        {"type": "at", "data": {"qq": qq_number}},
+        {"type": "text", "data": {"text": " " + _safe_text(messages.message(key, name=name))}},
+    ]
     fut = asyncio.run_coroutine_threadsafe(
-        _call_api(ws, "send_group_msg", {"group_id": int(group_id()), "message": text}),
+        _call_api(ws, "send_group_msg", {"group_id": int(group_id()), "message": segments}),
         loop,
     )
     fut.result(timeout=10)
     return True
 
 
-def _mention(qq_number: str, name: str) -> str:
-    """构造群内的 @ 段（OneBot 11 的 CQ 码）。"""
-    return f"[CQ:at,qq={qq_number}] {name}"
+# 合法 QQ 号：5~12 位数字。写进 CQ/消息段前必须校验。
+_QQ_RE = re.compile(r"^[0-9]{5,12}$")
+
+
+def _safe_text(text: str) -> str:
+    """净化要发进群的文本。
+
+    即使改用了消息段数组，正文里若出现 `[CQ:` 仍可能被某些实现二次解析。
+    这里把方括号去掉——姓名等用户自填内容不该能构造出 CQ 码。
+    """
+    return text.replace("[", "").replace("]", "")
 
 
 class _HealthHandler(BaseHTTPRequestHandler):
@@ -119,11 +140,26 @@ class _HealthHandler(BaseHTTPRequestHandler):
             self._json(400, {"ok": False, "error": "missing qq/name/group config"})
             return
 
+        # ⚠️ qq 必须校验格式。
+        #
+        # 它会被拼进消息段/CQ 码，若不校验，带 token 的调用方（或 token 泄露后）
+        # 可以传 `0[CQ:at,qq=all]` 之类让机器人在群里 @全体或发图。
+        # 姓名同理 —— 在 _safe_text 里去掉方括号。
+        if not _QQ_RE.match(qq_number):
+            self._json(400, {"ok": False, "error": "bad qq"})
+            return
+
+        # kind 白名单：否则任何未知值都会静默按注册文案发送
+        if kind not in ("register", "reset"):
+            self._json(400, {"ok": False, "error": "bad kind"})
+            return
+
         try:
             sent = _notify_group_mention(qq_number, name, kind)
-        except Exception as exc:  # noqa: BLE001
+        except Exception:  # noqa: BLE001
+            # 不要把异常文本回给调用方（可能含内部地址/协议端返回）
             log.exception("发送群内 @ 通知失败")
-            self._json(500, {"ok": False, "error": str(exc)})
+            self._json(500, {"ok": False, "error": "notify failed"})
             return
 
         if not sent:
@@ -169,11 +205,29 @@ def _serve_health() -> None:
 
 
 def _authorized(ws) -> bool:
-    """校验 NapCat 带来的访问令牌（若配置了）。"""
+    """校验协议端带来的访问令牌。
+
+    ⚠️ 必须 **fail-closed**：未配置 ONEBOT_ACCESS_TOKEN 时**拒绝一切连接**。
+
+    为什么这条至关重要：整个「群内确认」机制的安全依据是
+    「事件里的 user_id 一定来自真实协议端」。若未授权的连接被接受，
+    任何同网络的容器都能伪造一条
+        {"user_id": "<受害者QQ>", "raw_message": "确认重置"}
+    从而在受害者毫不知情的情况下完成重置确认，进而接管账号。
+
+    之前这里写的是 `if not ACCESS_TOKEN: return True` ——
+    少一个 else 就是一个后门。
+
+    比较用 hmac.compare_digest（常量时间），与 web 侧实现保持一致。
+    """
     if not ACCESS_TOKEN:
-        return True
+        log.error(
+            "拒绝协议端连接：未配置 ONEBOT_ACCESS_TOKEN。"
+            "这是刻意为之（fail-closed）—— 空令牌等于任何人都能冒充协议端。"
+        )
+        return False
     header = ws.request.headers.get("authorization", "")
-    return header == f"Bearer {ACCESS_TOKEN}"
+    return hmac.compare_digest(header, f"Bearer {ACCESS_TOKEN}")
 
 
 async def _call_api(ws, action: str, params: dict) -> None:

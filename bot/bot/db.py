@@ -155,7 +155,7 @@ def confirm_registration(qq_number: str) -> str | None:
         with conn.cursor() as cur:
             # 锁住这一行：两个「确认注册」同时到达时，只有一个能成功
             cur.execute(
-                "SELECT id, name, student_id, password_hash, expires_at"
+                "SELECT id, name, student_id, password_hash, expires_at, handoff_hash"
                 "  FROM pending_registrations WHERE qq_number = %s FOR UPDATE",
                 (qq_number,),
             )
@@ -174,12 +174,23 @@ def confirm_registration(qq_number: str) -> str | None:
                 conn.commit()
                 return "ok"
 
+            # handoff：把发起注册时那个浏览器的凭据哈希一并存下（10 分钟有效）。
+            # 它是「注册完自动进站」的唯一凭据 —— 没有它，轮询接口就只剩
+            # 「用户存在」这个判据，那等于任意账号接管（已实测踩过这个坑）。
             cur.execute(
                 """
-                INSERT INTO users (name, student_id, qq_number, password_hash)
-                VALUES (%s, %s, %s, %s) RETURNING id
+                INSERT INTO users (name, student_id, qq_number, password_hash,
+                                   handoff_hash, handoff_expires_at)
+                VALUES (%s, %s, %s, %s, %s, now() + interval '10 minutes')
+                RETURNING id
                 """,
-                (row["name"], row["student_id"], qq_number, row["password_hash"]),
+                (
+                    row["name"],
+                    row["student_id"],
+                    qq_number,
+                    row["password_hash"],
+                    row["handoff_hash"],
+                ),
             )
             new_user = cur.fetchone()
             assert new_user is not None
