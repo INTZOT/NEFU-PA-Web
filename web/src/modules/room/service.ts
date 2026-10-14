@@ -617,13 +617,23 @@ async function notifyRoom(
   });
 }
 
-/** 取房间的时间段文案（通知里要写清是哪个约球）。 */
+/**
+ * 取房间的时间段文案（通知里要写清是哪个约球）。
+ *
+ * ⚠️ D-44 把 `time_slot`（自由文本）换成了 `start_at`/`end_at`（真实时间戳），
+ * 这个函数当时**漏改**，仍在查旧列名 → 取消约球时直接报
+ * `column "time_slot" does not exist`，接口 500。
+ *
+ * 现在复用 formatRoomTime —— 通知里显示的措辞与页面保持一致，
+ * 不再有第二处各自拼时间文案的地方。
+ */
 async function roomSlot(roomId: string): Promise<string> {
-  const row = await queryOne<{ time_slot: string }>(
-    "SELECT time_slot FROM match_rooms WHERE id = $1",
+  const row = await queryOne<{ start_at: string; end_at: string | null }>(
+    "SELECT start_at, end_at FROM match_rooms WHERE id = $1",
     [roomId],
   );
-  return row?.time_slot ?? "某个约球";
+  if (!row) return "某个约球";
+  return formatRoomTime(row.start_at, row.end_at);
 }
 
 /** 取用户姓名（通知里用姓名而不是「有人」，成员之间本来就互相可见姓名）。 */
